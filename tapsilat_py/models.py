@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 @dataclass
@@ -178,3 +178,18 @@ class OrderCreateDTO:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+@dataclass
+class CancelOrderDTO:
+    reference_id: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+class OrderResponse(dict):
+    def __init__(self, *args: Any, **kwargs: Any):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def reference_id(self) -> str:
+        return self.get("reference_id")

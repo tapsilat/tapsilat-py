@@ -17,6 +17,7 @@ from tapsilat_py.models import (
     OrderCreateDTO,
     OrderPFSubMerchantDTO,
     PaymentTermDTO,
+    RefundOrderDTO,
     ShippingAddressDTO,
     SubmerchantDTO,
     SubOrganizationDTO,
@@ -555,3 +556,115 @@ def test_cancel_order_success(monkeypatch):
     assert len(captured_payloads)==1
     sent_payload = captured_payloads[0]
     assert sent_payload["reference_id"] == "mock-reference-id"
+
+def test_refund_order_dto_to_dict():
+    dto = RefundOrderDTO(amount=50.0, reference_id="ref123", order_item_id="item001")
+    dto_dict = dto.to_dict()
+    assert dto_dict["amount"] == 50.0
+    assert dto_dict["reference_id"] == "ref123"
+    assert dto_dict["order_item_id"] == "item001"
+    assert "order_item_payment_id" in dto_dict
+    assert dto_dict["order_item_payment_id"] is None
+
+    dto_full = RefundOrderDTO(
+        amount=100.0,
+        reference_id="ref456",
+        order_item_id="item002",
+        order_item_payment_id="payment002"
+    )
+    dto_full_dict = dto_full.to_dict()
+    assert dto_full_dict["amount"] == 100.0
+    assert dto_full_dict["reference_id"] == "ref456"
+    assert dto_full_dict["order_item_id"] == "item002"
+    assert dto_full_dict["order_item_payment_id"] == "payment002"
+
+
+def test_refund_order_success(monkeypatch):
+    expected_api_response = {
+        "is_success": True,
+        "message": "REFUND_SUCCESSFUL",
+    }
+    dummy = DummyResponse(expected_api_response, 200)
+
+    captured_payloads = []
+    def mock_post(url, json, headers, timeout):
+        captured_payloads.append(json)
+        return dummy
+    monkeypatch.setattr("requests.post", mock_post)
+
+    refund_payload = RefundOrderDTO(amount=50.0, reference_id="order_ref_123", order_item_id="item_abc")
+    client = TapsilatAPI()
+    api_response = client.refund_order(refund_payload)
+
+    assert api_response == expected_api_response
+    assert len(captured_payloads) == 1
+    sent_payload = captured_payloads[0]
+    assert sent_payload["amount"] == 50.0
+    assert sent_payload["reference_id"] == "order_ref_123"
+    assert sent_payload["order_item_id"] == "item_abc"
+    assert sent_payload["order_item_payment_id"] is None # asdict includes None by default
+
+def test_refund_order_failure(monkeypatch):
+    api_error_response = {"code": 201010, "error": "REFUND_VALIDATION_ERROR"}
+    dummy = DummyResponse(api_error_response, 400)
+
+    captured_payloads = []
+    def mock_post(url, json, headers, timeout):
+        captured_payloads.append(json) # Capture payload even on failure for debugging if needed
+        return dummy
+    monkeypatch.setattr("requests.post", mock_post)
+
+    # Using a payload that might cause validation error, e.g. amount=0
+    refund_payload = RefundOrderDTO(amount=0, reference_id="order_ref_invalid")
+    client = TapsilatAPI()
+
+    with pytest.raises(APIException) as e:
+        client.refund_order(refund_payload)
+
+    assert e.value.status_code == 400
+    assert e.value.code == 201010
+    assert e.value.error == "REFUND_VALIDATION_ERROR"
+    assert len(captured_payloads) == 1 # Ensure mock_post was called
+
+def test_refund_all_order_success(monkeypatch):
+    expected_api_response = {
+        "is_success": True,
+        "message": "REFUND_ALL_SUCCESSFUL",
+    }
+    dummy = DummyResponse(expected_api_response, 200)
+
+    captured_payloads = []
+    def mock_post(url, json, headers, timeout):
+        captured_payloads.append(json)
+        return dummy
+    monkeypatch.setattr("requests.post", mock_post)
+
+    reference_id="order_ref_xyz"
+    client = TapsilatAPI()
+    api_response = client.refund_all_order(reference_id)
+
+    assert api_response == expected_api_response
+    assert len(captured_payloads) == 1
+    sent_payload = captured_payloads[0]
+    assert sent_payload["reference_id"] == "order_ref_xyz"
+
+def test_refund_all_order_failure(monkeypatch):
+    api_error_response = {"code": 201020, "error": "ORDER_NOT_FOUND_FOR_REFUND_ALL"}
+    dummy = DummyResponse(api_error_response, 400)
+
+    captured_payloads = []
+    def mock_post(url, json, headers, timeout):
+        captured_payloads.append(json)
+        return dummy
+    monkeypatch.setattr("requests.post", mock_post)
+
+    reference_id="order_ref_nonexistent"
+    client = TapsilatAPI()
+
+    with pytest.raises(APIException) as e:
+        client.refund_all_order(reference_id)
+
+    assert e.value.status_code == 400
+    assert e.value.code == 201020
+    assert e.value.error == "ORDER_NOT_FOUND_FOR_REFUND_ALL"
+    assert len(captured_payloads) == 1

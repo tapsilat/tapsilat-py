@@ -1,9 +1,8 @@
-import os
-from dotenv import load_dotenv
 import requests
+from dotenv import load_dotenv
+
 from .exceptions import APIException
-from .models import OrderCreateDTO
-import json
+from .models import OrderCreateDTO, OrderResponse
 
 load_dotenv()
 
@@ -25,7 +24,7 @@ class TapsilatAPI:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
 
-    def create_order(self, order: OrderCreateDTO) -> dict:
+    def create_order(self, order: OrderCreateDTO) -> OrderResponse:
         url = f"{self.base_url}/order/create"
         payload = order.to_dict()
         response = requests.post(
@@ -35,19 +34,29 @@ class TapsilatAPI:
             raise APIException(
                 response.status_code, response.json()["code"], response.json()["error"]
             )
-        return response.json()
+        json_data = response.json()
+        return OrderResponse(json_data)
 
-    def get_order(self, order_response: dict) -> dict:
-        if "reference_id" not in order_response:
-            raise APIException(0, 0, "reference_id is not defined!")
-        url = f"{self.base_url}/order/{order_response['reference_id']}"
+    def get_order(self, reference_id: str) -> OrderResponse:
+        url = f"{self.base_url}/order/{reference_id}"
         response = requests.get(url, headers=self._get_headers(), timeout=self.timeout)
         if not response.ok:
             raise APIException(
                 response.status_code, response.json()["code"], response.json()["error"]
             )
-        return response.json()
+        json_data = response.json()
+        return OrderResponse(json_data)
 
-    def get_checkout_url(self, order_response: dict) -> str:
-        response = self.get_order(order_response)
+    def get_checkout_url(self, reference_id: str) -> str:
+        response = self.get_order(reference_id)
         return response["checkout_url"]
+
+    def cancel_order(self, reference_id: str) -> dict:
+        url = f"{self.base_url}/order/cancel"
+        payload = {"reference_id":reference_id}
+        response = requests.post(url,json=payload, headers=self._get_headers(), timeout=self.timeout)
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        return response.json()

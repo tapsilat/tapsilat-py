@@ -91,8 +91,6 @@ def test_create_order_success(monkeypatch):
 
     api_response = client.create_order(order_payload)
 
-    assert api_response["order_id"] == "mock-03d03353-78bc-4432-9da6-1433ecd7fbbb"
-    assert api_response["reference_id"] == "mock-03d03353-9b5b-4289-b231-ffbe50f8a79d"
     assert api_response == expected_api_response
 
     assert len(captured_payloads) == 1
@@ -453,7 +451,7 @@ def test_create_order_with_payment_terms_and_submerchants(monkeypatch):
     assert sent_payload["sub_organization"]["organization_name"] == "Sub Org"
 
 def test_get_order_success(monkeypatch):
-    order_response_arg = {"reference_id": "mock-03d03353-9b5b-4289-b231-ffbe50f8a79d"}
+    reference_id= "mock-03d03353-9b5b-4289-b231-ffbe50f8a79d"
     expected_api_response = {
         "checkout_url": "https://checkout.test.dev?reference_id=mock-03d03353-d2be-4094-b5f6-7b7a8473534e",
         "status": "PENDING"
@@ -462,7 +460,7 @@ def test_get_order_success(monkeypatch):
     monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
 
     client = TapsilatAPI()
-    result = client.get_order(order_response_arg)
+    result = client.get_order(reference_id)
 
     assert (
         result["checkout_url"]
@@ -472,24 +470,8 @@ def test_get_order_success(monkeypatch):
     assert result == expected_api_response
 
 
-def test_get_order_reference_id_not_defined(monkeypatch):
-    order_response_arg_missing_ref_id = {"error": "some_previous_error", "order_id": "mock-03d03343-d2be-4094-b5f6-7b7a8473534e"}
-
-    client = TapsilatAPI()
-
-    with pytest.raises(APIException) as e:
-        client.get_order(order_response_arg_missing_ref_id)
-
-    assert e.value.status_code == 0
-    assert e.value.code == 0
-    assert e.value.error == "reference_id is not defined!"
-
-
 def test_get_order_failure(monkeypatch):
-    order_response_arg = {
-        "reference_id": "mock-failed-reference-id",
-    }
-
+    reference_id= "mock-failed-reference-id"
     api_error_response = {"code": 101160, "error": "ORDER_ORDER_DETAIL_ORDER_NOT_FOUND"}
     dummy = DummyResponse(api_error_response, 400)
     monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
@@ -497,7 +479,7 @@ def test_get_order_failure(monkeypatch):
     client = TapsilatAPI()
 
     with pytest.raises(APIException) as e:
-        client.get_order(order_response_arg)
+        client.get_order(reference_id)
 
     assert e.value.status_code == 400
     assert e.value.code == 101160
@@ -505,7 +487,7 @@ def test_get_order_failure(monkeypatch):
 
 
 def test_get_checkout_url_success(monkeypatch):
-    order_response_arg = {"reference_id": "mock-ref-for-checkout"}
+    reference_id = "mock-ref-for-checkout"
     get_order_api_response = {
         "checkout_url": "https://checkout.test.dev?reference_id=mock-checkout-url-generated",
         "status": "Waiting for payment"
@@ -515,20 +497,61 @@ def test_get_checkout_url_success(monkeypatch):
     monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
 
     client = TapsilatAPI()
-    checkout_url_result = client.get_checkout_url(order_response_arg)
+    checkout_url_result = client.get_checkout_url(reference_id)
 
     assert (
         checkout_url_result
         == "https://checkout.test.dev?reference_id=mock-checkout-url-generated"
     )
 
-def test_get_checkout_url_raises_exception_if_reference_id_missing_in_arg(monkeypatch):
-    order_response_arg_missing_ref_id = {"order_id": "order123_no_ref"}
+def test_cancel_order_not_found(monkeypatch):
+    expected_api_response = {
+        "code": 101550,
+        "error": "ORDER_CANCEL_ORDER_GET_ORDER_NOT_FOUND"
+    }
+    dummy = DummyResponse(expected_api_response, 400)
+
+    captured_payloads = []
+
+    def mock_post(url, json, headers, timeout):
+        captured_payloads.append(json)
+        return dummy
+
+    monkeypatch.setattr("requests.post", mock_post)
+
+    reference_id="mock-reference-id"
     client = TapsilatAPI()
 
     with pytest.raises(APIException) as e:
-        client.get_checkout_url(order_response_arg_missing_ref_id)
+        client.cancel_order(reference_id)
 
-    assert e.value.status_code == 0
-    assert e.value.code == 0
-    assert e.value.error == "reference_id is not defined!"
+    assert e.value.status_code == 400
+    assert e.value.code == 101550
+    assert e.value.error == "ORDER_CANCEL_ORDER_GET_ORDER_NOT_FOUND"
+
+def test_cancel_order_success(monkeypatch):
+    expected_api_response = {
+        "is_success": True,
+        "message": "ORDER_CANCEL_SUCCESS",
+        "status": "101645"
+    }
+    dummy = DummyResponse(expected_api_response, 200)
+
+    captured_payloads = []
+
+    def mock_post(url, json, headers, timeout):
+        captured_payloads.append(json)
+        return dummy
+
+    monkeypatch.setattr("requests.post", mock_post)
+
+    reference_id="mock-reference-id"
+
+    client = TapsilatAPI()
+
+    api_response = client.cancel_order(reference_id)
+
+    assert api_response==expected_api_response
+    assert len(captured_payloads)==1
+    sent_payload = captured_payloads[0]
+    assert sent_payload["reference_id"] == "mock-reference-id"

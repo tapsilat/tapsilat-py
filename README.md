@@ -67,3 +67,18 @@ client.refund_order(refund_data)
 reference_id = "mock-uuid-reference-id"
 client.refund_all_order(reference_id)
 ```
+### Get order payment details
+```python
+reference_id = "mock-uuid-reference-id"
+client.get_order_payment_details(reference_id)
+```
+### Get order status
+```python
+reference_id = "mock-uuid-reference-id"
+client.get_order_status(reference_id)
+```
+### Get order transactions
+```python
+reference_id = "mock-uuid-reference-id"
+client.get_order_transactions(reference_id)
+```

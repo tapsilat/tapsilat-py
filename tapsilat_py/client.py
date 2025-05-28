@@ -84,3 +84,30 @@ class TapsilatAPI:
                 response.status_code, response.json()["code"], response.json()["error"]
             )
         return response.json()
+
+    def get_order_payment_details(self, reference_id: str) -> dict:
+        url = f"{self.base_url}/order/{reference_id}/payment-details"
+        response = requests.get(url, headers=self._get_headers(), timeout=self.timeout)
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        return response.json()
+
+    def get_order_status(self, reference_id: str) -> dict:
+        url = f"{self.base_url}/order/{reference_id}/status"
+        response = requests.get(url, headers=self._get_headers(), timeout=self.timeout)
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        return response.json()
+
+    def get_order_transactions(self, reference_id: str) -> dict:
+        url = f"{self.base_url}/order/{reference_id}/transactions"
+        response = requests.get(url, headers=self._get_headers(), timeout=self.timeout)
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        return response.json()

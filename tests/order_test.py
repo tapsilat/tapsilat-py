@@ -602,7 +602,7 @@ def test_refund_order_success(monkeypatch):
     assert sent_payload["amount"] == 50.0
     assert sent_payload["reference_id"] == "order_ref_123"
     assert sent_payload["order_item_id"] == "item_abc"
-    assert sent_payload["order_item_payment_id"] is None # asdict includes None by default
+    assert sent_payload["order_item_payment_id"] is None
 
 def test_refund_order_failure(monkeypatch):
     api_error_response = {"code": 201010, "error": "REFUND_VALIDATION_ERROR"}
@@ -610,11 +610,10 @@ def test_refund_order_failure(monkeypatch):
 
     captured_payloads = []
     def mock_post(url, json, headers, timeout):
-        captured_payloads.append(json) # Capture payload even on failure for debugging if needed
+        captured_payloads.append(json)
         return dummy
     monkeypatch.setattr("requests.post", mock_post)
 
-    # Using a payload that might cause validation error, e.g. amount=0
     refund_payload = RefundOrderDTO(amount=0, reference_id="order_ref_invalid")
     client = TapsilatAPI()
 
@@ -624,7 +623,7 @@ def test_refund_order_failure(monkeypatch):
     assert e.value.status_code == 400
     assert e.value.code == 201010
     assert e.value.error == "REFUND_VALIDATION_ERROR"
-    assert len(captured_payloads) == 1 # Ensure mock_post was called
+    assert len(captured_payloads) == 1
 
 def test_refund_all_order_success(monkeypatch):
     expected_api_response = {
@@ -668,3 +667,133 @@ def test_refund_all_order_failure(monkeypatch):
     assert e.value.code == 201020
     assert e.value.error == "ORDER_NOT_FOUND_FOR_REFUND_ALL"
     assert len(captured_payloads) == 1
+
+def test_get_order_payment_details_success(monkeypatch):
+    reference_id = "mock-reference-id"
+    expected_response = {
+                    "id": "mock-payment-details-id",
+                    "organization_id": "mock-org-id",
+                    "rule": {
+                        "name": "VPOS",
+                        "id": "00000000-0000-0000-0000-000000000000"
+                    },
+                    "vpos": {
+                        "id": "mock-vpos-id",
+                        "name": "TestVPOS",
+                        "commission_rate": "0",
+                        "acquirer": "Payment Org - Test"
+                    },
+                    "order": {
+                        "reference_id": "mock-reference-id",
+                        "id": "mock-process-id",
+                        "status": "Cancelled",
+                        "paid_date": "2025-01-26 12:11:40",
+                        "paid_date_timestamp": 1737893500
+                    },
+                    "paymentDetails": {
+                        "order_id": "mock-order-id",
+                        "reference_id": "mock-reference-id",
+                        "payment_id": "mock-payment-id"
+                    },
+                    "vposResponse": "mock-vpos-response",
+                    "order_payment_status": {
+                        "masked_pan": "555544******1111",
+                        "expiry_year": "26",
+                        "expiry_month": "12"
+                    },
+                    "conversation_id": "mock-conversation-id"
+                }
+
+    dummy = DummyResponse(expected_response, 200)
+    monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
+
+    client = TapsilatAPI()
+    result = client.get_order_payment_details(reference_id)
+
+    assert result == expected_response
+
+def test_get_order_payment_details_not_found(monkeypatch):
+    reference_id = "mock-reference-id"
+    error_response = {"code": 101230, "error": "ORDER_ORDER_PAYMENT_DETAIL_ORDER_DETAIL_NOT_FOUND"}
+    dummy = DummyResponse(error_response, 400)
+
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: dummy)
+
+    client = TapsilatAPI()
+    with pytest.raises(APIException) as e:
+        client.get_order_payment_details(reference_id)
+
+    assert e.value.status_code == 400
+    assert e.value.code == 101230
+    assert e.value.error == "ORDER_ORDER_PAYMENT_DETAIL_ORDER_DETAIL_NOT_FOUND"
+
+def test_get_order_status_success(monkeypatch):
+    reference_id = "mock-reference-id"
+    expected_response = {"status": "Refunded"}
+
+    dummy = DummyResponse(expected_response, 200)
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: dummy)
+
+    client = TapsilatAPI()
+    result = client.get_order_status(reference_id)
+
+    assert result == expected_response
+
+def test_get_order_status_not_found(monkeypatch):
+    reference_id = "mock-reference-id"
+    error_response = {"code": 100810, "error": "ORDER_GET_NOT_FOUND"}
+    dummy = DummyResponse(error_response, 400)
+
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: dummy)
+
+    client = TapsilatAPI()
+    with pytest.raises(APIException) as e:
+        client.get_order_status(reference_id)
+
+    assert e.value.status_code == 400
+    assert e.value.code == 100810
+    assert e.value.error == "ORDER_GET_NOT_FOUND"
+
+def test_get_order_transactions_success(monkeypatch):
+    reference_id = "mock-reference-id"
+    expected_response = [{
+                    "id": "mock-transaction-2",
+                    "sender": "TapsilatDEV",
+                    "receiver": " ",
+                    "amount": "1.00 TRY",
+                    "date": "2025-01-26 12:12:03",
+                    "status": "Made",
+                    "reference_id": "mock-reference-id"
+                },
+                {
+                    "id": "mock-transaction-1",
+                    "sender": " ",
+                    "receiver": "test",
+                    "amount": "1.00 TRY",
+                    "date": "2025-01-26 12:11:40",
+                    "status": "Done",
+                    "reference_id": "mock-reference-id"
+                }]
+    dummy = DummyResponse(expected_response, 200)
+
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: dummy)
+
+    client = TapsilatAPI()
+    result = client.get_order_transactions(reference_id)
+
+    assert result == expected_response
+
+def test_get_order_transactions_not_found(monkeypatch):
+    reference_id = "mock-reference-id"
+    expected_response = {"code":101260, "error":"ORDER_GET_ORDER_TXS_GET_ORDER_NOT_FOUND"}
+    dummy = DummyResponse(expected_response, 400)
+
+    monkeypatch.setattr("requests.get", lambda *args, **kwargs: dummy)
+
+    client = TapsilatAPI()
+    with pytest.raises(APIException) as e:
+        client.get_order_status(reference_id)
+
+    assert e.value.status_code == 400
+    assert e.value.code == 101260
+    assert e.value.error == "ORDER_GET_ORDER_TXS_GET_ORDER_NOT_FOUND"

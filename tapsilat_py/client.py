@@ -2,7 +2,7 @@ import requests
 from dotenv import load_dotenv
 
 from .exceptions import APIException
-from .models import OrderCreateDTO, OrderResponse
+from .models import OrderCreateDTO, OrderResponse, RefundOrderDTO
 
 load_dotenv()
 
@@ -55,6 +55,30 @@ class TapsilatAPI:
         url = f"{self.base_url}/order/cancel"
         payload = {"reference_id":reference_id}
         response = requests.post(url,json=payload, headers=self._get_headers(), timeout=self.timeout)
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        return response.json()
+
+    def refund_order(self, refund_data: RefundOrderDTO) -> dict:
+        url = f"{self.base_url}/order/refund"
+        payload = refund_data.to_dict()
+        response = requests.post(
+            url, json=payload, headers=self._get_headers(), timeout=self.timeout
+        )
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        return response.json()
+
+    def refund_all_order(self, reference_id: str) -> dict:
+        url = f"{self.base_url}/order/refund-all"
+        payload = {"reference_id":reference_id}
+        response = requests.post(
+            url, json=payload, headers=self._get_headers(), timeout=self.timeout
+        )
         if not response.ok:
             raise APIException(
                 response.status_code, response.json()["code"], response.json()["error"]

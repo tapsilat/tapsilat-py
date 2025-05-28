@@ -180,11 +180,15 @@ class OrderCreateDTO:
         return asdict(self)
 
 @dataclass
-class CancelOrderDTO:
+class RefundOrderDTO:
+    amount: float
     reference_id: str
+    order_item_id: Optional[str] = None
+    order_item_payment_id: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
+
 
 class OrderResponse(dict):
     def __init__(self, *args: Any, **kwargs: Any):

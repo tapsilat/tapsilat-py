@@ -47,6 +47,37 @@ class TapsilatAPI:
         json_data = response.json()
         return OrderResponse(json_data)
 
+    def get_order_by_conversation_id(self, conversation_id: str) -> OrderResponse:
+        url = f"{self.base_url}/order/conversation/{conversation_id}"
+        response = requests.get(url, headers=self._get_headers(), timeout=self.timeout)
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        json_data = response.json()
+        return OrderResponse(json_data)
+
+    def get_order_list(self, page:int=1, per_page:int=10, start_date:str="", end_date:str="", organization_id:str="", related_reference_id:str="") -> dict:
+        url = f"{self.base_url}/order/list"
+        raw_params = {"page": page, "per_page": per_page, "start_date": start_date, "end_date": end_date, "organization_id": organization_id, "related_reference_id": related_reference_id}
+        params = {k: v for k, v in raw_params.items() if v not in ("", None)}
+        response = requests.get(url, headers=self._get_headers(), params=params, timeout=self.timeout)
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        return response.json()
+
+    def get_order_submerchants(self, page:int=1, per_page:int=10) -> dict:
+        url = f"{self.base_url}/order/submerchants"
+        params = {"page": page, "per_page": per_page}
+        response = requests.get(url, headers=self._get_headers(), params=params, timeout=self.timeout)
+        if not response.ok:
+            raise APIException(
+                response.status_code, response.json()["code"], response.json()["error"]
+            )
+        return response.json()
+
     def get_checkout_url(self, reference_id: str) -> str:
         response = self.get_order(reference_id)
         return response["checkout_url"]

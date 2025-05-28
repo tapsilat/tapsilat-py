@@ -455,7 +455,7 @@ def test_get_order_success(monkeypatch):
     reference_id= "mock-03d03353-9b5b-4289-b231-ffbe50f8a79d"
     expected_api_response = {
         "checkout_url": "https://checkout.test.dev?reference_id=mock-03d03353-d2be-4094-b5f6-7b7a8473534e",
-        "status": "PENDING"
+        "status": 8
     }
     dummy = DummyResponse(expected_api_response, 200)
     monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
@@ -467,9 +467,8 @@ def test_get_order_success(monkeypatch):
         result["checkout_url"]
         == "https://checkout.test.dev?reference_id=mock-03d03353-d2be-4094-b5f6-7b7a8473534e"
     )
-    assert result["status"] == "PENDING"
+    assert result["status"] == 8
     assert result == expected_api_response
-
 
 def test_get_order_failure(monkeypatch):
     reference_id= "mock-failed-reference-id"
@@ -486,6 +485,119 @@ def test_get_order_failure(monkeypatch):
     assert e.value.code == 101160
     assert e.value.error == "ORDER_ORDER_DETAIL_ORDER_NOT_FOUND"
 
+def test_get_order_by_conversation_id_success(monkeypatch):
+    conversation_id= "mock-conversation-id"
+    expected_api_response = {
+        "checkout_url": "https://checkout.test.dev?reference_id=mock-03d03353-d2be-4094-b5f6-7b7a8473534e",
+        "status": 8
+    }
+    dummy = DummyResponse(expected_api_response, 200)
+    monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
+
+    client = TapsilatAPI()
+    result = client.get_order_by_conversation_id(conversation_id)
+
+    assert result == expected_api_response
+
+def test_get_order_by_conversation_id_failure(monkeypatch):
+    conversation_id= "mock-conversation-id"
+    api_error_response = {"code": 101160, "error": "ORDER_ORDER_DETAIL_ORDER_NOT_FOUND"}
+    dummy = DummyResponse(api_error_response, 400)
+    monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
+
+    client = TapsilatAPI()
+
+    with pytest.raises(APIException) as e:
+        client.get_order_by_conversation_id(conversation_id)
+
+    assert e.value.status_code == 400
+    assert e.value.code == 101160
+    assert e.value.error == "ORDER_ORDER_DETAIL_ORDER_NOT_FOUND"
+
+def test_get_order_list(monkeypatch):
+    page=1
+    per_page=3
+    expected_api_response = {
+        "page": 1,
+        "per_page": 3,
+        "rows":[
+            {
+                "id": "mock-id-3",
+                "reference_id": "mock-ref-id-3",
+                "name": "John Doe",
+                "email": "test@example.com",
+                "total": "150.00 TRY",
+                "checkout_url": "https://checkout.tapsilat.dev?reference_id=mock-ref-id-3",
+                "status": 8,
+                "organization": "TapsilatDEV",
+                "unpaid_amount": 100
+            },
+            {
+                "id": "mock-id-2",
+                "reference_id": "mock-ref-id-2",
+                "name": "John Doe",
+                "email": "test@example.com",
+                "total": "250.00 TRY",
+                "checkout_url": "https://checkout.tapsilat.dev?reference_id=mock-ref-id-2",
+                "status": 15,
+                "organization": "TapsilatDEV",
+                "unpaid_amount": 100
+            },
+            {
+                "id": "mock-id-1",
+                "reference_id": "mock-ref-id-1",
+                "name": "John Doe",
+                "email": "test@example.com",
+                "total": "100.00 TRY",
+                "checkout_url": "https://checkout.tapsilat.dev?reference_id=mock-ref-id-1",
+                "status": 7,
+                "organization": "TapsilatDEV",
+                "unpaid_amount": 100
+            }
+        ],
+        "total":24,
+        "total_page":8
+    }
+    dummy = DummyResponse(expected_api_response, 200)
+    monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
+
+    client = TapsilatAPI()
+    result = client.get_order_list(page, per_page)
+
+    assert len(result["rows"]) == per_page
+    assert result == expected_api_response
+
+def test_get_order_submerchants(monkeypatch):
+    page=1
+    per_page=2
+    expected_api_response = {
+        "page": 1,
+        "per_page": 2,
+        "row": [
+            {
+                "acquirer": "Another Org",
+                "email": "test@example.com",
+                "id": "mock-id-1",
+                "submerchant_key": "mock-id-1"
+            },
+            {
+                "acquirer": "TapsilatDev",
+                "email": "test@example.com",
+                "id": "mock-id-2",
+                "submerchant_key": "mock-id-2"
+            }
+        ],
+        "total": 10,
+        "total_pages": 5
+        }
+    dummy = DummyResponse(expected_api_response, 200)
+    monkeypatch.setattr("requests.get", lambda *a, **k: dummy)
+
+    client = TapsilatAPI()
+    result = client.get_order_submerchants(page, per_page)
+
+    assert len(result["row"]) == per_page
+    assert result == expected_api_response
 
 def test_get_checkout_url_success(monkeypatch):
     reference_id = "mock-ref-for-checkout"

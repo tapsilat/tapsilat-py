@@ -85,7 +85,18 @@ class TapsilatAPI:
             )
         return response.json()
 
-    def get_order_payment_details(self, reference_id: str) -> dict:
+    def get_order_payment_details(self, reference_id: str, conversation_id: str="") -> dict:
+        if conversation_id!="":
+            url = f"{self.base_url}/order/payment-details"
+            payload = {"conversation_id": conversation_id, "reference_id":reference_id}
+            response = requests.post(
+                url, json=payload, headers=self._get_headers(), timeout=self.timeout
+            )
+            if not response.ok:
+                raise APIException(
+                    response.status_code, response.json()["code"], response.json()["error"]
+                )
+            return response.json()
         url = f"{self.base_url}/order/{reference_id}/payment-details"
         response = requests.get(url, headers=self._get_headers(), timeout=self.timeout)
         if not response.ok:

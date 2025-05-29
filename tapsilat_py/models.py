@@ -20,6 +20,7 @@ class BuyerDTO:
     title: Optional[str] = None
     zip_code: Optional[str] = None
 
+
 @dataclass
 class BasketItemPayerDTO:
     address: Optional[str] = None
@@ -28,6 +29,7 @@ class BasketItemPayerDTO:
     title: Optional[str] = None
     type: Optional[str] = None
     vat: Optional[str] = None
+
 
 @dataclass
 class BasketItemDTO:
@@ -49,6 +51,7 @@ class BasketItemDTO:
     sub_merchant_key: Optional[str] = None
     sub_merchant_price: Optional[str] = None
 
+
 @dataclass
 class BillingAddressDTO:
     address: Optional[str] = None
@@ -64,6 +67,7 @@ class BillingAddressDTO:
     vat_number: Optional[str] = None
     zip_code: Optional[str] = None
 
+
 @dataclass
 class CheckoutDesignDTO:
     input_background_color: Optional[str] = None
@@ -77,15 +81,18 @@ class CheckoutDesignDTO:
     right_background_color: Optional[str] = None
     text_color: Optional[str] = None
 
+
 @dataclass
 class MetadataDTO:
     key: str
     value: str
 
+
 @dataclass
 class OrderCardDTO:
     card_id: str
     card_sequence: int
+
 
 @dataclass
 class PaymentTermDTO:
@@ -97,6 +104,7 @@ class PaymentTermDTO:
     status: Optional[str] = None
     term_reference_id: Optional[str] = None
     term_sequence: Optional[int] = None
+
 
 @dataclass
 class OrderPFSubMerchantDTO:
@@ -113,6 +121,7 @@ class OrderPFSubMerchantDTO:
     submerchant_url: Optional[str] = None
     terminal_no: Optional[str] = None
 
+
 @dataclass
 class ShippingAddressDTO:
     address: Optional[str] = None
@@ -122,6 +131,7 @@ class ShippingAddressDTO:
     shipping_date: Optional[str] = None
     tracking_code: Optional[str] = None
     zip_code: Optional[str] = None
+
 
 @dataclass
 class SubOrganizationDTO:
@@ -142,11 +152,13 @@ class SubOrganizationDTO:
     tax_number: Optional[str] = None
     tax_office: Optional[str] = None
 
+
 @dataclass
 class SubmerchantDTO:
     amount: Optional[float] = None
     merchant_reference_id: Optional[str] = None
     order_basket_item_id: Optional[str] = None
+
 
 @dataclass
 class OrderCreateDTO:
@@ -179,12 +191,63 @@ class OrderCreateDTO:
     def to_dict(self) -> dict:
         return asdict(self)
 
+
 @dataclass
 class RefundOrderDTO:
     amount: float
     reference_id: str
     order_item_id: Optional[str] = None
     order_item_payment_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class OrderPaymentTermCreateDTO:
+    order_id: str
+    term_reference_id: str
+    amount: float
+    due_date: str
+    term_sequence: int
+    required: bool
+    status: str
+    data: Optional[str] = None
+    paid_date: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class OrderPaymentTermDeleteDTO:
+    order_id: str
+    term_reference_id: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class OrderPaymentTermUpdateDTO:
+    term_reference_id: str
+    amount: Optional[float] = None
+    due_date: Optional[str] = None
+    paid_date: Optional[str] = None
+    required: Optional[bool] = None
+    status: Optional[str] = None
+    term_sequence: Optional[int] = None
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class OrderTermRefundRequest:
+    term_id: str
+    amount: float
+    reference_id: Optional[str] = None
+    term_payment_id: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -197,3 +260,11 @@ class OrderResponse(dict):
     @property
     def reference_id(self) -> str:
         return self.get("reference_id")
+
+    @property
+    def checkout_url(self) -> str:
+        return self.get("checkout_url")
+
+    @property
+    def order_id(self) -> str:
+        return self.get("order_id")

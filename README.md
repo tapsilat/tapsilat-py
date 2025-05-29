@@ -46,6 +46,19 @@ order_response = client.create_order(order)
 reference_id = "mock-uuid-reference-id"
 order_details = client.get_order(reference_id)
 ```
+### Get order details by conversation id
+```python
+conversation_id = "mock-uuid-conversation-id"
+order_details = client.get_order_by_conversation_id(reference_id)
+```
+### Get order list
+```python
+order_list = client.get_order_list(page=1, per_page=5)
+```
+### Get order submerchants
+```python
+order_list = client.get_order_submerchants(page=1, per_page=5)
+```
 ### Get checkout url
 ```python
 reference_id = "mock-uuid-reference-id"
@@ -66,4 +79,22 @@ client.refund_order(refund_data)
 ```python
 reference_id = "mock-uuid-reference-id"
 client.refund_all_order(reference_id)
+```
+### Get order payment details
+```python
+reference_id = "mock-uuid-reference-id"
+client.get_order_payment_details(reference_id)
+# You can get with conversation_id too
+conversation_id = "mock-uuid-conversation-id"
+client.get_order_payment_details(reference_id, conversation_id)
+```
+### Get order status
+```python
+reference_id = "mock-uuid-reference-id"
+client.get_order_status(reference_id)
+```
+### Get order transactions
+```python
+reference_id = "mock-uuid-reference-id"
+client.get_order_transactions(reference_id)
 ```

@@ -7,7 +7,6 @@ from .exceptions import APIException
 from .models import (
     OrderCreateDTO,
     OrderPaymentTermCreateDTO,
-    OrderPaymentTermDeleteDTO,
     OrderPaymentTermUpdateDTO,
     OrderResponse,
     OrderTermRefundRequest,
@@ -165,9 +164,9 @@ class TapsilatAPI:
         payload = term.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def delete_order_term(self, term: OrderPaymentTermDeleteDTO) -> dict:
+    def delete_order_term(self, order_id:str, term_reference_id: str) -> dict:
         endpoint = "/order/term"
-        payload = term.to_dict()
+        payload = {"order_id":order_id,"term_reference_id":term_reference_id}
         return self._make_request("DELETE", endpoint, json_payload=payload)
 
     def update_order_term(self, term: OrderPaymentTermUpdateDTO) -> dict:
@@ -178,4 +177,19 @@ class TapsilatAPI:
     def refund_order_term(self, term: OrderTermRefundRequest) -> dict:
         endpoint = "/order/term/refund"
         payload = term.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def order_terminate(self, reference_id: str) -> dict:
+        endpoint = "/order/terminate"
+        payload = {"reference_id":reference_id}
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def order_manual_callback(self, reference_id: str, conversation_id: str) -> dict:
+        endpoint = "/order/callback"
+        payload = {"reference_id":reference_id, "conversation_id":conversation_id}
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def order_related_update(self, reference_id: str, related_reference_id: str) -> dict:
+        endpoint = "/order/releated"
+        payload = {"reference_id":reference_id, "related_reference_id":related_reference_id}
         return self._make_request("POST", endpoint, json_payload=payload)

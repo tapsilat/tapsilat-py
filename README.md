@@ -98,3 +98,52 @@ client.get_order_status(reference_id)
 reference_id = "mock-uuid-reference-id"
 client.get_order_transactions(reference_id)
 ```
+### Get order term
+```python
+reference_id = "mock-uuid-reference-id"
+client.get_order_term(reference_id)
+```
+### Create order term
+```python
+order_id = "mock-order-id"
+terms = [
+    OrderPaymentTermCreateDTO(order_id=order_id, amount=5000, term_reference_id="TERM-123000456",due_date="2025-10-10 00:00",term_sequence=1),
+    OrderPaymentTermCreateDTO(order_id=order_id, amount=5000, term_reference_id="TERM-123000457",due_date="2025-11-10 00:00",term_sequence=2)
+]
+
+for term in terms:
+    client.create_order_term(term)
+```
+### Delete order term
+```python
+order_id = "mock-uuid-order-id"
+term_reference_id = "TERM-123000456"
+client.delete_order_term(order_id,term_reference_id)
+```
+### Update order term
+```python
+term = OrderPaymentTermUpdateDTO(term_reference_id="TERM-123000457",due_date="2025-12-10 00:00",required=True)
+client.update_order_term(term)
+```
+### Refund order term
+```python
+term_refund = OrderTermRefundRequest(term_reference_id="TERM-123000456",amount=1200)
+client.refund_order_term(term_refund)
+```
+### Terminate order term
+```python
+reference_id = "mock-uuid-reference-id"
+client.order_terminate(reference_id)
+```
+### Manual callback for order
+```python
+reference_id = "mock-uuid-reference-id"
+conversation_id = "mock-conversation-id"
+client.order_manual_callback(reference_id, conversation_id)
+```
+### Order related reference update
+```python
+reference_id = "mock-uuid-reference-id"
+related_reference_id = "mock-related-reference-id"
+client.order_related_update(reference_id, conversation_id)
+```

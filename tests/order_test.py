@@ -14,7 +14,6 @@ from tapsilat_py.models import (
     OrderCardDTO,
     OrderCreateDTO,
     OrderPaymentTermCreateDTO,
-    OrderPaymentTermDeleteDTO,
     OrderPaymentTermUpdateDTO,
     OrderPFSubMerchantDTO,
     OrderResponse,
@@ -768,25 +767,23 @@ def test_create_order_term_failure_status_invalid(mock_api_request):
 
 
 def test_delete_order_term_success(mock_api_request):
-    payload_dto = OrderPaymentTermDeleteDTO(
-        order_id="mock-order-id", term_reference_id="mock-term-id"
-    )
+    order_id="mock-order-id"
+    term_reference_id="mock-none-term-id"
     expected_response = {"code": 156090, "message": "ORDER_REMOVE_PAYMENT_TERM_SUCCESS"}
     mock_api_request.return_value = expected_response
 
     client = TapsilatAPI()
-    result = client.delete_order_term(payload_dto)
+    result = client.delete_order_term(order_id, term_reference_id)
 
     mock_api_request.assert_called_once_with(
-        "DELETE", "/order/term", json_payload=payload_dto.to_dict()
+        "DELETE", "/order/term", json_payload={"order_id":order_id, "term_reference_id":term_reference_id}
     )
     assert result == expected_response
 
 
 def test_delete_order_term_failure(mock_api_request):
-    payload_dto = OrderPaymentTermDeleteDTO(
-        order_id="mock-order-id", term_reference_id="mock-none-term-id"
-    )
+    order_id="mock-order-id"
+    term_reference_id="mock-none-term-id"
     api_error_content = {"code": 156070, "error": "ORDER_REMOVE_PAYMENT_TERM_NOT_FOUND"}
     mock_api_request.side_effect = APIException(
         status_code=400,
@@ -796,10 +793,10 @@ def test_delete_order_term_failure(mock_api_request):
 
     client = TapsilatAPI()
     with pytest.raises(APIException) as e:
-        client.delete_order_term(payload_dto)
+        client.delete_order_term(order_id, term_reference_id)
 
     mock_api_request.assert_called_once_with(
-        "DELETE", "/order/term", json_payload=payload_dto.to_dict()
+        "DELETE", "/order/term", json_payload={"order_id":order_id, "term_reference_id":term_reference_id}
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
@@ -843,3 +840,106 @@ def test_update_order_term_not_found(mock_api_request):
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
     assert e.value.error == api_error_content["error"]
+
+def test_order_terminate_order_not_found(mock_api_request):
+    reference_id = "mock-reference-id"
+    api_error_content = {"code": 338000, "error": "ORDER_TERMINATE_ORDER_NOT_FOUND"}
+    mock_api_request.side_effect = APIException(
+        status_code=400,
+        code=api_error_content["code"],
+        error=api_error_content["error"],
+    )
+
+    client = TapsilatAPI()
+    with pytest.raises(APIException) as e:
+        client.order_terminate(reference_id)
+
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/terminate", json_payload={"reference_id":reference_id}
+    )
+    assert e.value.status_code == 400
+    assert e.value.code == api_error_content["code"]
+    assert e.value.error == api_error_content["error"]
+
+def test_order_terminate_order_success(mock_api_request):
+    reference_id = "mock-reference-id"
+    expected_response = {"message": "ORDER_TERMINATE_ORDER_SUCCESS", "code": 338100}
+    mock_api_request.return_value = expected_response
+
+    client = TapsilatAPI()
+    result = client.order_terminate(reference_id)
+
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/terminate", json_payload={"reference_id":reference_id}
+    )
+    assert result == expected_response
+
+def test_order_callback_failed(mock_api_request):
+    reference_id = "mock-reference-id"
+    conversation_id = "mock-conversation-id"
+    api_error_content = {"code": 12000, "error": "ACTION_FAILED"}
+    mock_api_request.side_effect = APIException(
+        status_code=400,
+        code=api_error_content["code"],
+        error=api_error_content["error"],
+    )
+
+    client = TapsilatAPI()
+    with pytest.raises(APIException) as e:
+        client.order_manual_callback(reference_id, conversation_id)
+
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/callback", json_payload={"reference_id":reference_id, "conversation_id":conversation_id}
+    )
+    assert e.value.status_code == 400
+    assert e.value.code == api_error_content["code"]
+    assert e.value.error == api_error_content["error"]
+
+def test_order_callback_order_success(mock_api_request):
+    reference_id = "mock-reference-id"
+    conversation_id = "mock-conversation-id"
+    expected_response = {"message": "ORDER_MANUAL_CALLBACK_SUCCESS", "code": 337100}
+    mock_api_request.return_value = expected_response
+
+    client = TapsilatAPI()
+    result = client.order_manual_callback(reference_id, conversation_id)
+
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/callback", json_payload={"reference_id":reference_id, "conversation_id":conversation_id}
+    )
+    assert result == expected_response
+
+def test_order_related_update_not_found(mock_api_request):
+    reference_id = "mock-reference-id"
+    related_reference_id = "mock-related-reference-id"
+    api_error_content = {"code": 12000, "error": "ACTION_FAILED"}
+    mock_api_request.side_effect = APIException(
+        status_code=400,
+        code=api_error_content["code"],
+        error=api_error_content["error"],
+    )
+
+    client = TapsilatAPI()
+    with pytest.raises(APIException) as e:
+        client.order_related_update(reference_id, related_reference_id)
+
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/releated", json_payload={"reference_id":reference_id, "related_reference_id":related_reference_id}
+    )
+    assert e.value.status_code == 400
+    assert e.value.code == api_error_content["code"]
+    assert e.value.error == api_error_content["error"]
+
+def test_order_related_update_success(mock_api_request):
+    reference_id = "mock-reference-id"
+    related_reference_id = "mock-related-reference-id"
+    expected_response = {"message": "ORDER_UPDATE_ORDER_SUCCESS", "code": 156170, "is_success":True}
+    mock_api_request.return_value = expected_response
+
+    client = TapsilatAPI()
+    result = client.order_related_update(reference_id, related_reference_id)
+
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/releated", json_payload={"reference_id":reference_id, "related_reference_id":related_reference_id}
+    )
+    assert result == expected_response

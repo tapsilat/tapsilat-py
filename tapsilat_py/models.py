@@ -218,16 +218,6 @@ class OrderPaymentTermCreateDTO:
     def to_dict(self) -> dict:
         return asdict(self)
 
-
-@dataclass
-class OrderPaymentTermDeleteDTO:
-    order_id: str
-    term_reference_id: str
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-
 @dataclass
 class OrderPaymentTermUpdateDTO:
     term_reference_id: str

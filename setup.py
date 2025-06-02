@@ -13,7 +13,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Tapsilat",
-    author_email="-",
+    author_email="support@tapsilat.dev",
     url="https://github.com/tapsilat/tapsilat-py",
     packages=find_packages(exclude=["tests*"]),
     install_requires=[

@@ -1,9 +1,17 @@
+import pathlib
+
 from setuptools import find_packages, setup
+
+here = pathlib.Path(__file__).parent.resolve()
+
+long_description = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="tapsilat-py",
-    version="0.1.0",
+    version="2025.06.02.2",
     description="Client SDK for Tapsilat API",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     author="Tapsilat",
     author_email="-",
     url="https://github.com/tapsilat/tapsilat-py",

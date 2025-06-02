@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name="tapsilat-py",
@@ -12,9 +12,13 @@ setup(
         "requests>=2.25.0",
     ],
     python_requires=">=3.6",
+    project_urls={
+        "Source Code": "https://github.com/tapsilat/tapsilat-py",
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
+
 )

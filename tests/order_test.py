@@ -179,8 +179,6 @@ def test_refund_order_dto_to_dict():
     assert dto_dict["amount"] == 50.0
     assert dto_dict["reference_id"] == "ref123"
     assert dto_dict["order_item_id"] == "item001"
-    assert "order_item_payment_id" in dto_dict
-    assert dto_dict["order_item_payment_id"] is None
 
     dto_full = RefundOrderDTO(
         amount=100.0,

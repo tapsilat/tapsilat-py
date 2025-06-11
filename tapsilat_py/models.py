@@ -1,6 +1,17 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from typing import Any, List, Optional
 
+
+def _asdict_factory(data):
+    # that sanitizes `None` values
+    def convert_value(obj):
+        if isinstance(obj, list):
+            return [convert_value(v) for v in obj]
+        if is_dataclass(obj):
+            return _asdict_factory(obj)
+        return obj
+
+    return {k: convert_value(v) for k, v in asdict(data).items() if v is not None}
 
 @dataclass
 class BuyerDTO:
@@ -189,7 +200,7 @@ class OrderCreateDTO:
     three_d_force: Optional[bool] = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return _asdict_factory(self)
 
 
 @dataclass
@@ -200,7 +211,7 @@ class RefundOrderDTO:
     order_item_payment_id: Optional[str] = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return _asdict_factory(self)
 
 
 @dataclass
@@ -216,7 +227,7 @@ class OrderPaymentTermCreateDTO:
     paid_date: Optional[str] = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return _asdict_factory(self)
 
 @dataclass
 class OrderPaymentTermUpdateDTO:

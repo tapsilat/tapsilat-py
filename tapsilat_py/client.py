@@ -12,6 +12,7 @@ from .models import (
     OrderTermRefundRequest,
     RefundOrderDTO,
 )
+from .validators import validate_gsm_number, validate_installments
 
 load_dotenv()
 
@@ -78,6 +79,17 @@ class TapsilatAPI:
 
     def create_order(self, order: OrderCreateDTO) -> OrderResponse:
         endpoint = "/order/create"
+
+        # Validate GSM number if provided
+        if order.buyer and order.buyer.gsm_number:
+            order.buyer.gsm_number = validate_gsm_number(order.buyer.gsm_number)
+
+        # Validate installments if provided as string (convert from legacy format)
+        if hasattr(order, 'enabled_installments') and order.enabled_installments:
+            order.enabled_installments = str(order.enabled_installments) # type: ignore
+            order.enabled_installments = order.enabled_installments.replace("[").replace("]").replace(" ") # type: ignore
+            order.enabled_installments = validate_installments(order.enabled_installments) # type: ignore
+
         payload = order.to_dict()
         return OrderResponse(self._make_request("POST", endpoint, json_payload=payload))
 

@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional
 
 import requests
-from dotenv import load_dotenv
 
 from .exceptions import APIException
 from .models import (
@@ -13,8 +12,6 @@ from .models import (
     RefundOrderDTO,
 )
 from .validators import validate_gsm_number, validate_installments
-
-load_dotenv()
 
 
 class TapsilatAPI:

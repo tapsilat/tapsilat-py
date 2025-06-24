@@ -941,3 +941,53 @@ def test_order_related_update_success(mock_api_request):
         "POST", "/order/releated", json_payload={"reference_id":reference_id, "related_reference_id":related_reference_id}
     )
     assert result == expected_response
+
+
+def test_create_order_with_gsm_validation(mock_api_request):
+    expected_api_json_response = {
+        "order_id": "mock-gsm-validation",
+        "reference_id": "mock-gsm-ref",
+    }
+    mock_api_request.return_value = expected_api_json_response
+
+    buyer = BuyerDTO(
+        name="John",
+        surname="Doe",
+        email="test@example.com",
+        gsm_number="+90 555 123-45-67"  # Will be cleaned by validator
+    )
+    order_payload_dto = OrderCreateDTO(
+        amount=100,
+        currency="TRY",
+        locale="tr",
+        buyer=buyer,
+    )
+    client = TapsilatAPI()
+    order_response_obj = client.create_order(order_payload_dto)
+
+    # Verify GSM was cleaned
+    assert order_payload_dto.buyer.gsm_number == "+905551234567"
+    mock_api_request.assert_called_once()
+    assert isinstance(order_response_obj, OrderResponse)
+
+
+def test_create_order_with_invalid_gsm_raises_exception(mock_api_request):
+    buyer = BuyerDTO(
+        name="John",
+        surname="Doe",
+        email="test@example.com",
+        gsm_number="invalid-phone"
+    )
+    order_payload_dto = OrderCreateDTO(
+        amount=100,
+        currency="TRY",
+        locale="tr",
+        buyer=buyer,
+    )
+    client = TapsilatAPI()
+
+    with pytest.raises(APIException) as exc_info:
+        client.create_order(order_payload_dto)
+
+    assert exc_info.value.code == 0
+    mock_api_request.assert_not_called()

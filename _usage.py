@@ -12,6 +12,7 @@ from tapsilat_py.models import (
     OrderCreateDTO,
     ShippingAddressDTO,
 )
+from tapsilat_py.validators import validate_gsm_number, validate_installments
 
 # TAPSILAT_API_KEY from environment
 
@@ -117,6 +118,46 @@ def run_scenario_5_detailed_checkout_design_full(client):
     payload = OrderCreateDTO(amount=55.00, currency="TRY", locale="tr", buyer=buyer, checkout_design=design)
     process_order_creation(client, payload, "Scenario 4: Detailed Checkout Design (Full)")
 
+def run_scenario_6_validation_demo(client):
+    try:
+        # Test GSM validation
+        valid_gsm = validate_gsm_number("+905551234567")
+        print(f"Valid GSM: {valid_gsm}")
+
+        # Test installments validation
+        valid_installments = validate_installments("1,2,3,6")
+        print(f"Valid installments: {valid_installments}")
+
+        # Create order with validated data
+        buyer = BuyerDTO(
+            name="John",
+            surname="Doe",
+            email="test@example.com",
+            gsm_number="+905551234567"
+        )
+        order_payload = OrderCreateDTO(
+            amount=100.00,
+            currency="TRY",
+            locale="tr",
+            buyer=buyer,
+            enabled_installments=[1, 2, 3, 6]
+        )
+        process_order_creation(client, order_payload, "Scenario 6: Validation Demo")
+
+    except APIException as e:
+        print(f"Validation Error: {e.error}")
+
+def run_scenario_7_validation_errors(client):
+    try:
+        validate_gsm_number("invalid-phone")
+    except APIException as e:
+        print(f"GSM Validation Error: {e.error}")
+
+    try:
+        validate_installments("1,15,abc")
+    except APIException as e:
+        print(f"Installments Validation Error: {e.error}")
+
 
 if __name__ == "__main__":
     api_client = get_api_client()
@@ -126,6 +167,8 @@ if __name__ == "__main__":
         run_scenario_3_order_with_addresses(api_client)
         run_scenario_4_installments_and_payment_methods(api_client)
         run_scenario_5_detailed_checkout_design_full(api_client)
+        run_scenario_6_validation_demo(api_client)
+        run_scenario_7_validation_errors(api_client)
         print("\nAll scenarios completed.")
     else:
         print("API client could not be initialized.")

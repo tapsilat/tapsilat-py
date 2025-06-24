@@ -33,10 +33,56 @@ API_KEY = str(os.getenv("TAPSILAT_API_KEY"))
 client = TapsilatAPI(API_KEY)
 ```
 
+### Validators
+The SDK includes built-in validators for common data types:
+
+#### GSM Number Validation
+```python
+from tapsilat_py.validators import validate_gsm_number
+
+# Valid formats
+valid_gsm = validate_gsm_number("+905551234567")  # International with +
+valid_gsm = validate_gsm_number("00905551234567")  # International with 00
+valid_gsm = validate_gsm_number("05551234567")     # National format
+valid_gsm = validate_gsm_number("5551234567")      # Local format
+
+# Automatically cleans formatting
+clean_gsm = validate_gsm_number("+90 555 123-45-67")  # Returns: "+905551234567"
+
+# Raises APIException for invalid formats
+try:
+    validate_gsm_number("invalid-phone")
+except APIException as e:
+    print(f"Error: {e.error}")
+```
+
+#### Installments Validation
+```python
+from tapsilat_py.validators import validate_installments
+
+# Valid installment strings
+installments = validate_installments("1,2,3,6")     # Returns: [1, 2, 3, 6]
+installments = validate_installments("1, 2, 3, 6") # Handles spaces
+installments = validate_installments("")            # Returns: [1] (default)
+
+# Raises APIException for invalid values
+try:
+    validate_installments("1,15,abc")  # 15 > 12, abc is not a number
+except APIException as e:
+    print(f"Error: {e.error}")
+```
+
 ### Order create process
 ```python
 from tapsilat_py.models import BuyerDTO, OrderCreateDTO
-buyer = BuyerDTO(name="John", surname="Doe", email="test@example.com")
+
+# GSM number will be automatically validated in create_order
+buyer = BuyerDTO(
+    name="John", 
+    surname="Doe", 
+    email="test@example.com",
+    gsm_number="+90 555 123-45-67"  # Will be cleaned automatically
+)
 order = OrderCreateDTO(amount=100, currency="TRY", locale="tr", buyer=buyer)
 
 order_response = client.create_order(order)

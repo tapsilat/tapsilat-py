@@ -84,7 +84,7 @@ class TapsilatAPI:
         # Validate installments if provided as string (convert from legacy format)
         if hasattr(order, 'enabled_installments') and order.enabled_installments:
             order.enabled_installments = str(order.enabled_installments) # type: ignore
-            order.enabled_installments = order.enabled_installments.replace("[").replace("]").replace(" ") # type: ignore
+            order.enabled_installments = order.enabled_installments.replace("[","").replace("]","").replace(" ","") # type: ignore
             order.enabled_installments = validate_installments(order.enabled_installments) # type: ignore
 
         payload = order.to_dict()

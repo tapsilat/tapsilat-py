@@ -6,6 +6,11 @@ needs Python3.6+
 
 ## Installation
 ```bash
+pip install tapsilat-py
+```
+or
+
+```bash
 pip install git+https://github.com/tapsilat/tapsilat-py.git
 ```
 or

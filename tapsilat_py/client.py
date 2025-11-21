@@ -10,6 +10,13 @@ from .models import (
     OrderResponse,
     OrderTermRefundRequest,
     RefundOrderDTO,
+    SubscriptionCancelRequest,
+    SubscriptionCreateRequest,
+    SubscriptionCreateResponse,
+    SubscriptionDetail,
+    SubscriptionGetRequest,
+    SubscriptionRedirectRequest,
+    SubscriptionRedirectResponse,
 )
 from .validators import validate_gsm_number, validate_installments
 
@@ -19,7 +26,7 @@ class TapsilatAPI:
         self,
         api_key: str = "",
         timeout: int = 10,
-        base_url: str = "https://acquiring.tapsilat.dev/api/v1",
+        base_url: str = "https://panel.tapsilat.dev/api/v1",
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -202,3 +209,51 @@ class TapsilatAPI:
         endpoint = "/order/releated"
         payload = {"reference_id":reference_id, "related_reference_id":related_reference_id}
         return self._make_request("POST", endpoint, json_payload=payload)
+
+    def get_orders(self, page: str = "1", per_page: str = "10", buyer_id: str = "") -> dict:
+        """Get orders with pagination and optional buyer filter"""
+        endpoint = "/order/list"
+        params = {"page": page, "per_page": per_page}
+        if buyer_id:
+            params["buyer_id"] = buyer_id
+        return self._make_request("GET", endpoint, params=params)
+
+    def get_organization_settings(self) -> dict:
+        """Get organization settings"""
+        endpoint = "/organization/settings"
+        return self._make_request("GET", endpoint)
+
+    # Subscription methods
+    def get_subscription(self, request: SubscriptionGetRequest) -> SubscriptionDetail:
+        """Get subscription details by reference_id or external_reference_id"""
+        endpoint = "/subscription"
+        payload = request.to_dict()
+        response = self._make_request("POST", endpoint, json_payload=payload)
+        return SubscriptionDetail(**response)
+
+    def cancel_subscription(self, request: SubscriptionCancelRequest) -> dict:
+        """Cancel a subscription by reference_id or external_reference_id"""
+        endpoint = "/subscription/cancel"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def create_subscription(self, request: SubscriptionCreateRequest) -> SubscriptionCreateResponse:
+        """Create a new subscription"""
+        endpoint = "/subscription/create"
+        payload = request.to_dict()
+        response = self._make_request("POST", endpoint, json_payload=payload)
+        return SubscriptionCreateResponse(**response)
+
+    def list_subscriptions(self, page: int = 1, per_page: int = 10) -> dict:
+        """List all subscriptions with pagination"""
+        endpoint = "/subscription/list"
+        params = {"page": page, "per_page": per_page}
+        return self._make_request("GET", endpoint, params=params)
+
+    def redirect_subscription(self, request: SubscriptionRedirectRequest) -> SubscriptionRedirectResponse:
+        """Get redirect URL for a subscription"""
+        endpoint = "/subscription/redirect"
+        payload = request.to_dict()
+        response = self._make_request("POST", endpoint, json_payload=payload)
+        return SubscriptionRedirectResponse(**response)
+

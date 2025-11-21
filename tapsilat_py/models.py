@@ -1,9 +1,12 @@
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, fields, is_dataclass
 from typing import Any, List, Optional
 
 
 def _asdict_factory(data):
-    # that sanitizes `None` values
+    """Convert dataclass to dict, removing None values and handling nested dataclasses"""
+    if not is_dataclass(data):
+        return data
+    
     def convert_value(obj):
         if isinstance(obj, list):
             return [convert_value(v) for v in obj]
@@ -11,7 +14,12 @@ def _asdict_factory(data):
             return _asdict_factory(obj)
         return obj
 
-    return {k: convert_value(v) for k, v in asdict(data).items() if v is not None}
+    result = {}
+    for field in fields(data):
+        value = getattr(data, field.name)
+        if value is not None:
+            result[field.name] = convert_value(value)
+    return result
 
 @dataclass
 class BuyerDTO:
@@ -240,7 +248,7 @@ class OrderPaymentTermUpdateDTO:
     term_sequence: Optional[int] = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return {k: v for k, v in asdict(self).items() if v is not None}
 
 
 @dataclass
@@ -251,7 +259,126 @@ class OrderTermRefundRequest:
     term_payment_id: Optional[str] = None
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
+class SubscriptionBilling:
+    address: Optional[str] = None
+    city: Optional[str] = None
+    contact_name: Optional[str] = None
+    country: Optional[str] = None
+    vat_number: Optional[str] = None
+    zip_code: Optional[str] = None
+
+
+@dataclass
+class SubscriptionUser:
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    email: Optional[str] = None
+    first_name: Optional[str] = None
+    id: Optional[str] = None
+    identity_number: Optional[str] = None
+    last_name: Optional[str] = None
+    phone: Optional[str] = None
+    zip_code: Optional[str] = None
+
+
+@dataclass
+class SubscriptionGetRequest:
+    external_reference_id: Optional[str] = None
+    reference_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
+class SubscriptionCancelRequest:
+    external_reference_id: Optional[str] = None
+    reference_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
+class SubscriptionCreateRequest:
+    amount: Optional[float] = None
+    billing: Optional[SubscriptionBilling] = None
+    card_id: Optional[str] = None
+    currency: Optional[str] = None
+    cycle: Optional[int] = None
+    external_reference_id: Optional[str] = None
+    failure_url: Optional[str] = None
+    payment_date: Optional[int] = None
+    period: Optional[int] = None
+    success_url: Optional[str] = None
+    title: Optional[str] = None
+    user: Optional[SubscriptionUser] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class SubscriptionRedirectRequest:
+    subscription_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+@dataclass
+class SubscriptionOrder:
+    amount: Optional[str] = None
+    currency: Optional[str] = None
+    payment_date: Optional[str] = None
+    payment_url: Optional[str] = None
+    reference_id: Optional[str] = None
+    status: Optional[str] = None
+
+
+@dataclass
+class SubscriptionDetail:
+    amount: Optional[str] = None
+    currency: Optional[str] = None
+    due_date: Optional[str] = None
+    external_reference_id: Optional[str] = None
+    is_active: Optional[bool] = None
+    orders: Optional[List[SubscriptionOrder]] = None
+    payment_date: Optional[int] = None
+    payment_status: Optional[str] = None
+    period: Optional[int] = None
+    title: Optional[str] = None
+
+
+@dataclass
+class SubscriptionCreateResponse:
+    code: Optional[int] = None
+    message: Optional[str] = None
+    order_reference_id: Optional[str] = None
+    reference_id: Optional[str] = None
+
+
+@dataclass
+class SubscriptionListItem:
+    amount: Optional[str] = None
+    currency: Optional[str] = None
+    external_reference_id: Optional[str] = None
+    is_active: Optional[bool] = None
+    payment_date: Optional[int] = None
+    payment_status: Optional[str] = None
+    period: Optional[int] = None
+    reference_id: Optional[str] = None
+    title: Optional[str] = None
+
+
+@dataclass
+class SubscriptionRedirectResponse:
+    url: Optional[str] = None
 
 
 class OrderResponse(dict):

@@ -11,6 +11,12 @@ from tapsilat_py.models import (
     CheckoutDesignDTO,
     OrderCreateDTO,
     ShippingAddressDTO,
+    SubscriptionBilling,
+    SubscriptionCancelRequest,
+    SubscriptionCreateRequest,
+    SubscriptionGetRequest,
+    SubscriptionRedirectRequest,
+    SubscriptionUser,
 )
 from tapsilat_py.validators import validate_gsm_number, validate_installments
 
@@ -83,8 +89,8 @@ def run_scenario_2_order_with_basket_items(client):
 
 def run_scenario_3_order_with_addresses(client):
     buyer_data = BuyerDTO(name="John", surname="Doe", email="test@example.com")
-    billing_address_data = BillingAddressDTO(address="uskudar", city="Istanbul", country="TR", contact_name="John Doe", zip_code="34000")
-    shipping_address_data = ShippingAddressDTO(address="kadikoy", city="Istanbul", country="TR", contact_name="Jane Doe", zip_code="34001")
+    billing_address_data = BillingAddressDTO(address="123 Main St", city="Istanbul", country="TR", contact_name="John Doe", zip_code="34000")
+    shipping_address_data = ShippingAddressDTO(address="456 Oak Ave", city="Istanbul", country="TR", contact_name="Jane Doe", zip_code="34001")
 
     order_payload = OrderCreateDTO(
         amount=25.00,
@@ -159,15 +165,137 @@ def run_scenario_7_validation_errors(client):
         print(f"Installments Validation Error: {e.error}")
 
 
+def run_scenario_8_get_orders(client):
+    """Get orders with pagination and buyer filter"""
+    print("#"*16)
+    print("Scenario 8: Get Orders with Pagination")
+    try:
+        # Get orders for a specific buyer
+        response = client.get_orders(page="1", per_page="10", buyer_id="buyer_123")
+        print(f"Orders: {response}")
+    except APIException as e:
+        print(f"Error: {e.error}")
+
+
+def run_scenario_9_organization_settings(client):
+    """Get organization settings"""
+    print("#"*16)
+    print("Scenario 9: Get Organization Settings")
+    try:
+        settings = client.get_organization_settings()
+        print(f"Organization Settings: {settings}")
+    except APIException as e:
+        print(f"Error: {e.error}")
+
+
+def run_scenario_10_subscription_create(client):
+    """Create a subscription"""
+    print("#"*16)
+    print("Scenario 10: Create Subscription")
+    try:
+        user = SubscriptionUser(
+            first_name="John",
+            last_name="Doe",
+            email="john.doe@example.com",
+            phone="+905551234567",
+            identity_number="12345678901"
+        )
+        billing = SubscriptionBilling(
+            address="Test Address",
+            city="Istanbul",
+            country="TR",
+            contact_name="John Doe",
+            zip_code="34000"
+        )
+        subscription_request = SubscriptionCreateRequest(
+            amount=100.0,
+            currency="TRY",
+            cycle=12,
+            period=1,
+            payment_date=1,
+            title="Monthly Subscription",
+            external_reference_id="ext_ref_123",
+            user=user,
+            billing=billing,
+            success_url="https://example.com/success",
+            failure_url="https://example.com/failure"
+        )
+        response = client.create_subscription(subscription_request)
+        print(f"Subscription created: {response}")
+    except APIException as e:
+        print(f"Error: {e.error}")
+
+
+def run_scenario_11_subscription_get(client):
+    """Get subscription details"""
+    print("#"*16)
+    print("Scenario 11: Get Subscription")
+    try:
+        request = SubscriptionGetRequest(reference_id="sub_ref_123")
+        subscription = client.get_subscription(request)
+        print(f"Subscription: {subscription}")
+    except APIException as e:
+        print(f"Error: {e.error}")
+
+
+def run_scenario_12_subscription_list(client):
+    """List all subscriptions"""
+    print("#"*16)
+    print("Scenario 12: List Subscriptions")
+    try:
+        subscriptions = client.list_subscriptions(page=1, per_page=10)
+        print(f"Subscriptions: {subscriptions}")
+    except APIException as e:
+        print(f"Error: {e.error}")
+
+
+def run_scenario_13_subscription_cancel(client):
+    """Cancel a subscription"""
+    print("#"*16)
+    print("Scenario 13: Cancel Subscription")
+    try:
+        request = SubscriptionCancelRequest(reference_id="sub_ref_123")
+        response = client.cancel_subscription(request)
+        print(f"Subscription cancelled: {response}")
+    except APIException as e:
+        print(f"Error: {e.error}")
+
+
+def run_scenario_14_subscription_redirect(client):
+    """Get subscription redirect URL"""
+    print("#"*16)
+    print("Scenario 14: Subscription Redirect")
+    try:
+        request = SubscriptionRedirectRequest(subscription_id="sub_id_123")
+        response = client.redirect_subscription(request)
+        print(f"Redirect URL: {response.url}")
+    except APIException as e:
+        print(f"Error: {e.error}")
+
+
 if __name__ == "__main__":
     api_client = get_api_client()
     if api_client:
+        # Order scenarios
         run_scenario_1_basic_order(api_client)
         run_scenario_2_order_with_basket_items(api_client)
         run_scenario_3_order_with_addresses(api_client)
         run_scenario_4_installments_and_payment_methods(api_client)
         run_scenario_5_detailed_checkout_design_full(api_client)
         run_scenario_6_validation_demo(api_client)
+        run_scenario_7_validation_errors(api_client)
+        
+        # New methods
+        run_scenario_8_get_orders(api_client)
+        run_scenario_9_organization_settings(api_client)
+        
+        # Subscription scenarios
+        run_scenario_10_subscription_create(api_client)
+        run_scenario_11_subscription_get(api_client)
+        run_scenario_12_subscription_list(api_client)
+        run_scenario_13_subscription_cancel(api_client)
+        run_scenario_14_subscription_redirect(api_client)
+
         run_scenario_7_validation_errors(api_client)
         print("\nAll scenarios completed.")
     else:

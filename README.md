@@ -196,5 +196,135 @@ client.order_manual_callback(reference_id, conversation_id)
 ```python
 reference_id = "mock-uuid-reference-id"
 related_reference_id = "mock-related-reference-id"
-client.order_related_update(reference_id, conversation_id)
+client.order_related_update(reference_id, related_reference_id)
 ```
+
+## Additional Methods
+
+### Get Orders with Pagination and Filter
+```python
+# Get orders with pagination
+orders = client.get_orders(page="1", per_page="10")
+
+# Get orders for a specific buyer
+orders = client.get_orders(page="1", per_page="10", buyer_id="buyer_123")
+```
+
+### Get Organization Settings
+```python
+settings = client.get_organization_settings()
+print(f"Organization settings: {settings}")
+```
+
+## Subscription Management
+
+The SDK provides comprehensive subscription management features.
+
+### Create Subscription
+```python
+from tapsilat_py.models import (
+    SubscriptionCreateRequest,
+    SubscriptionUser,
+    SubscriptionBilling
+)
+
+# Create user and billing information
+user = SubscriptionUser(
+    first_name="John",
+    last_name="Doe",
+    email="john.doe@example.com",
+    phone="+905551234567",
+    identity_number="12345678901"
+)
+
+billing = SubscriptionBilling(
+    address="Test Address",
+    city="Istanbul",
+    country="TR",
+    contact_name="John Doe",
+    zip_code="34000"
+)
+
+# Create subscription request
+subscription_request = SubscriptionCreateRequest(
+    amount=100.0,
+    currency="TRY",
+    cycle=12,  # Number of billing cycles
+    period=1,  # Billing period (1=monthly, 3=quarterly, 12=yearly)
+    payment_date=1,  # Day of month for payment
+    title="Monthly Subscription",
+    external_reference_id="ext_ref_123",
+    user=user,
+    billing=billing,
+    success_url="https://example.com/success",
+    failure_url="https://example.com/failure"
+)
+
+response = client.create_subscription(subscription_request)
+print(f"Subscription ID: {response.reference_id}")
+print(f"Order Reference ID: {response.order_reference_id}")
+```
+
+### Get Subscription Details
+```python
+from tapsilat_py.models import SubscriptionGetRequest
+
+# Get by reference_id
+request = SubscriptionGetRequest(reference_id="sub_ref_123")
+subscription = client.get_subscription(request)
+
+# Or get by external_reference_id
+request = SubscriptionGetRequest(external_reference_id="ext_ref_123")
+subscription = client.get_subscription(request)
+
+print(f"Subscription title: {subscription.title}")
+print(f"Amount: {subscription.amount} {subscription.currency}")
+print(f"Status: {subscription.payment_status}")
+print(f"Active: {subscription.is_active}")
+```
+
+### List Subscriptions
+```python
+subscriptions = client.list_subscriptions(page=1, per_page=10)
+print(f"Total subscriptions: {subscriptions.get('total')}")
+for sub in subscriptions.get('data', []):
+    print(f"Subscription: {sub['reference_id']} - {sub['title']}")
+```
+
+### Cancel Subscription
+```python
+from tapsilat_py.models import SubscriptionCancelRequest
+
+# Cancel by reference_id
+request = SubscriptionCancelRequest(reference_id="sub_ref_123")
+response = client.cancel_subscription(request)
+
+# Or cancel by external_reference_id
+request = SubscriptionCancelRequest(external_reference_id="ext_ref_123")
+response = client.cancel_subscription(request)
+```
+
+### Get Subscription Redirect URL
+```python
+from tapsilat_py.models import SubscriptionRedirectRequest
+
+request = SubscriptionRedirectRequest(subscription_id="sub_id_123")
+response = client.redirect_subscription(request)
+print(f"Redirect to: {response.url}")
+```
+
+## Error Handling
+
+All API methods raise `APIException` on errors:
+
+```python
+from tapsilat_py.exceptions import APIException
+
+try:
+    order = client.create_order(order_data)
+except APIException as e:
+    print(f"Status Code: {e.status_code}")
+    print(f"Error Code: {e.code}")
+    print(f"Error Message: {e.error}")
+```
+

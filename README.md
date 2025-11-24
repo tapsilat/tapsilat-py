@@ -20,6 +20,26 @@ cd tapsilat-py
 pip install -r requirements.txt
 ```
 
+## Running Tests
+
+### Unit Tests
+```bash
+pytest tests/unit
+```
+
+### Integration Tests
+Integration tests require a valid `TAPSILAT_API_KEY` in a `.env` file.
+
+1. Create a `.env` file in the root directory:
+```
+TAPSILAT_API_KEY=your_api_key_here
+```
+
+2. Run the integration tests:
+```bash
+pytest tests/integration
+```
+
 
 ## Usage
 .env file

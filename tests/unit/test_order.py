@@ -193,7 +193,7 @@ def test_refund_order_dto_to_dict():
     assert dto_full_dict["order_item_payment_id"] == "payment002"
 
 
-def test_create_order_success(mock_api_request):
+def test_create_order_success(mock_api_request, mocker):
     expected_api_json_response = {
         "order_id": "mock-03d03353-78bc-4432-9da6-1433ecd7fbbb",
         "reference_id": "mock-03d03353-9b5b-4289-b231-ffbe50f8a79d",
@@ -207,6 +207,9 @@ def test_create_order_success(mock_api_request):
         locale="tr",
         buyer=buyer,
     )
+    mock_get_checkout_url = mocker.patch.object(TapsilatAPI, "get_checkout_url")
+    mock_get_checkout_url.return_value = "http://checkout.url"
+
     client = TapsilatAPI()
     order_response_obj = client.create_order(order_payload_dto)
 
@@ -216,9 +219,10 @@ def test_create_order_success(mock_api_request):
     assert isinstance(order_response_obj, OrderResponse)
     assert order_response_obj.order_id == expected_api_json_response["order_id"]
     assert order_response_obj.reference_id == expected_api_json_response["reference_id"]
+    assert order_response_obj.checkout_url == "http://checkout.url"
 
 
-def test_create_order_with_basket_items(mock_api_request):
+def test_create_order_with_basket_items(mock_api_request, mocker):
     expected_api_json_response = {
         "order_id": "order_basket",
         "reference_id": "ref_basket",
@@ -246,6 +250,10 @@ def test_create_order_with_basket_items(mock_api_request):
         basket_items=[basket_item1, basket_item2],
     )
     client = TapsilatAPI()
+
+    mock_get_checkout_url = mocker.patch.object(TapsilatAPI, "get_checkout_url")
+    mock_get_checkout_url.return_value = "http://checkout.url"
+
     api_response = client.create_order(order_payload_dto)
 
     mock_api_request.assert_called_once_with(
@@ -652,10 +660,7 @@ def test_get_order_term_success(mock_api_request):
     client = TapsilatAPI()
     result = client.get_order_term(term_reference_id)
 
-    expected_params = {"term_reference_id": term_reference_id}
-    mock_api_request.assert_called_once_with(
-        "GET", "/order/term", params=expected_params
-    )
+    mock_api_request.assert_called_once_with("GET", f"/order/term/{term_reference_id}")
     assert result == expected_response
 
 
@@ -672,10 +677,7 @@ def test_get_order_term_failure(mock_api_request):
     with pytest.raises(APIException) as e:
         client.get_order_term(term_reference_id)
 
-    expected_params = {"term_reference_id": term_reference_id}
-    mock_api_request.assert_called_once_with(
-        "GET", "/order/term", params=expected_params
-    )
+    mock_api_request.assert_called_once_with("GET", f"/order/term/{term_reference_id}")
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
     assert e.value.error == api_error_content["error"]
@@ -765,8 +767,8 @@ def test_create_order_term_failure_status_invalid(mock_api_request):
 
 
 def test_delete_order_term_success(mock_api_request):
-    order_id="mock-order-id"
-    term_reference_id="mock-none-term-id"
+    order_id = "mock-order-id"
+    term_reference_id = "mock-none-term-id"
     expected_response = {"code": 156090, "message": "ORDER_REMOVE_PAYMENT_TERM_SUCCESS"}
     mock_api_request.return_value = expected_response
 
@@ -774,14 +776,16 @@ def test_delete_order_term_success(mock_api_request):
     result = client.delete_order_term(order_id, term_reference_id)
 
     mock_api_request.assert_called_once_with(
-        "DELETE", "/order/term", json_payload={"order_id":order_id, "term_reference_id":term_reference_id}
+        "POST",
+        "/order/term/delete",
+        json_payload={"order_id": order_id, "term_reference_id": term_reference_id},
     )
     assert result == expected_response
 
 
 def test_delete_order_term_failure(mock_api_request):
-    order_id="mock-order-id"
-    term_reference_id="mock-none-term-id"
+    order_id = "mock-order-id"
+    term_reference_id = "mock-none-term-id"
     api_error_content = {"code": 156070, "error": "ORDER_REMOVE_PAYMENT_TERM_NOT_FOUND"}
     mock_api_request.side_effect = APIException(
         status_code=400,
@@ -794,7 +798,9 @@ def test_delete_order_term_failure(mock_api_request):
         client.delete_order_term(order_id, term_reference_id)
 
     mock_api_request.assert_called_once_with(
-        "DELETE", "/order/term", json_payload={"order_id":order_id, "term_reference_id":term_reference_id}
+        "POST",
+        "/order/term/delete",
+        json_payload={"order_id": order_id, "term_reference_id": term_reference_id},
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
@@ -812,7 +818,7 @@ def test_update_order_term_success(mock_api_request):
     result = client.update_order_term(payload_dto)
 
     mock_api_request.assert_called_once_with(
-        "PATCH", "/order/term", json_payload=payload_dto.to_dict()
+        "POST", "/order/term/update", json_payload=payload_dto.to_dict()
     )
     assert result == expected_response
 
@@ -833,11 +839,12 @@ def test_update_order_term_not_found(mock_api_request):
         client.update_order_term(payload_dto)
 
     mock_api_request.assert_called_once_with(
-        "PATCH", "/order/term", json_payload=payload_dto.to_dict()
+        "POST", "/order/term/update", json_payload=payload_dto.to_dict()
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
     assert e.value.error == api_error_content["error"]
+
 
 def test_order_terminate_order_not_found(mock_api_request):
     reference_id = "mock-reference-id"
@@ -853,11 +860,12 @@ def test_order_terminate_order_not_found(mock_api_request):
         client.order_terminate(reference_id)
 
     mock_api_request.assert_called_once_with(
-        "POST", "/order/terminate", json_payload={"reference_id":reference_id}
+        "POST", "/order/terminate", json_payload={"reference_id": reference_id}
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
     assert e.value.error == api_error_content["error"]
+
 
 def test_order_terminate_order_success(mock_api_request):
     reference_id = "mock-reference-id"
@@ -868,9 +876,10 @@ def test_order_terminate_order_success(mock_api_request):
     result = client.order_terminate(reference_id)
 
     mock_api_request.assert_called_once_with(
-        "POST", "/order/terminate", json_payload={"reference_id":reference_id}
+        "POST", "/order/terminate", json_payload={"reference_id": reference_id}
     )
     assert result == expected_response
+
 
 def test_order_callback_failed(mock_api_request):
     reference_id = "mock-reference-id"
@@ -887,11 +896,14 @@ def test_order_callback_failed(mock_api_request):
         client.order_manual_callback(reference_id, conversation_id)
 
     mock_api_request.assert_called_once_with(
-        "POST", "/order/callback", json_payload={"reference_id":reference_id, "conversation_id":conversation_id}
+        "POST",
+        "/order/manual-callback",
+        json_payload={"reference_id": reference_id, "conversation_id": conversation_id},
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
     assert e.value.error == api_error_content["error"]
+
 
 def test_order_callback_order_success(mock_api_request):
     reference_id = "mock-reference-id"
@@ -903,9 +915,12 @@ def test_order_callback_order_success(mock_api_request):
     result = client.order_manual_callback(reference_id, conversation_id)
 
     mock_api_request.assert_called_once_with(
-        "POST", "/order/callback", json_payload={"reference_id":reference_id, "conversation_id":conversation_id}
+        "POST",
+        "/order/manual-callback",
+        json_payload={"reference_id": reference_id, "conversation_id": conversation_id},
     )
     assert result == expected_response
+
 
 def test_order_related_update_not_found(mock_api_request):
     reference_id = "mock-reference-id"
@@ -922,28 +937,43 @@ def test_order_related_update_not_found(mock_api_request):
         client.order_related_update(reference_id, related_reference_id)
 
     mock_api_request.assert_called_once_with(
-        "POST", "/order/releated", json_payload={"reference_id":reference_id, "related_reference_id":related_reference_id}
+        "POST",
+        "/order/related-update",
+        json_payload={
+            "reference_id": reference_id,
+            "related_reference_id": related_reference_id,
+        },
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
     assert e.value.error == api_error_content["error"]
 
+
 def test_order_related_update_success(mock_api_request):
     reference_id = "mock-reference-id"
     related_reference_id = "mock-related-reference-id"
-    expected_response = {"message": "ORDER_UPDATE_ORDER_SUCCESS", "code": 156170, "is_success":True}
+    expected_response = {
+        "message": "ORDER_UPDATE_ORDER_SUCCESS",
+        "code": 156170,
+        "is_success": True,
+    }
     mock_api_request.return_value = expected_response
 
     client = TapsilatAPI()
     result = client.order_related_update(reference_id, related_reference_id)
 
     mock_api_request.assert_called_once_with(
-        "POST", "/order/releated", json_payload={"reference_id":reference_id, "related_reference_id":related_reference_id}
+        "POST",
+        "/order/related-update",
+        json_payload={
+            "reference_id": reference_id,
+            "related_reference_id": related_reference_id,
+        },
     )
     assert result == expected_response
 
 
-def test_create_order_with_gsm_validation(mock_api_request):
+def test_create_order_with_gsm_validation(mock_api_request, mocker):
     expected_api_json_response = {
         "order_id": "mock-gsm-validation",
         "reference_id": "mock-gsm-ref",
@@ -954,7 +984,7 @@ def test_create_order_with_gsm_validation(mock_api_request):
         name="John",
         surname="Doe",
         email="test@example.com",
-        gsm_number="+90 555 123-45-67"  # Will be cleaned by validator
+        gsm_number="+90 555 123-45-67",  # Will be cleaned by validator
     )
     order_payload_dto = OrderCreateDTO(
         amount=100,
@@ -963,6 +993,10 @@ def test_create_order_with_gsm_validation(mock_api_request):
         buyer=buyer,
     )
     client = TapsilatAPI()
+
+    mock_get_checkout_url = mocker.patch.object(TapsilatAPI, "get_checkout_url")
+    mock_get_checkout_url.return_value = "http://checkout.url"
+
     order_response_obj = client.create_order(order_payload_dto)
 
     # Verify GSM was cleaned
@@ -973,10 +1007,7 @@ def test_create_order_with_gsm_validation(mock_api_request):
 
 def test_create_order_with_invalid_gsm_raises_exception(mock_api_request):
     buyer = BuyerDTO(
-        name="John",
-        surname="Doe",
-        email="test@example.com",
-        gsm_number="invalid-phone"
+        name="John", surname="Doe", email="test@example.com", gsm_number="invalid-phone"
     )
     order_payload_dto = OrderCreateDTO(
         amount=100,

@@ -89,13 +89,30 @@ class TapsilatAPI:
             order.buyer.gsm_number = validate_gsm_number(order.buyer.gsm_number)
 
         # Validate installments if provided as string (convert from legacy format)
-        if hasattr(order, 'enabled_installments') and order.enabled_installments:
-            order.enabled_installments = str(order.enabled_installments) # type: ignore
-            order.enabled_installments = order.enabled_installments.replace("[","").replace("]","").replace(" ","") # type: ignore
-            order.enabled_installments = validate_installments(order.enabled_installments) # type: ignore
+        if hasattr(order, "enabled_installments") and order.enabled_installments:
+            order.enabled_installments = str(order.enabled_installments)  # type: ignore
+            order.enabled_installments = (
+                order.enabled_installments.replace("[", "")
+                .replace("]", "")
+                .replace(" ", "")
+            )  # type: ignore
+            order.enabled_installments = validate_installments(
+                order.enabled_installments
+            )  # type: ignore
 
         payload = order.to_dict()
-        return OrderResponse(self._make_request("POST", endpoint, json_payload=payload))
+        response_data = self._make_request("POST", endpoint, json_payload=payload)
+        response = OrderResponse(response_data)
+
+        if response.reference_id:
+            try:
+                checkout_url = self.get_checkout_url(response.reference_id)
+                if checkout_url:
+                    response["checkout_url"] = checkout_url
+            except Exception:
+                pass
+
+        return response
 
     def get_order(self, reference_id: str) -> OrderResponse:
         endpoint = f"/order/{reference_id}"
@@ -171,24 +188,23 @@ class TapsilatAPI:
         return self._make_request("GET", endpoint)
 
     def get_order_term(self, term_reference_id: str) -> dict:
-        endpoint = "/order/term"
-        params = {"term_reference_id": term_reference_id}
-        return self._make_request("GET", endpoint, params=params)
+        endpoint = f"/order/term/{term_reference_id}"
+        return self._make_request("GET", endpoint)
 
     def create_order_term(self, term: OrderPaymentTermCreateDTO) -> dict:
         endpoint = "/order/term"
         payload = term.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def delete_order_term(self, order_id:str, term_reference_id: str) -> dict:
-        endpoint = "/order/term"
-        payload = {"order_id":order_id,"term_reference_id":term_reference_id}
-        return self._make_request("DELETE", endpoint, json_payload=payload)
+    def delete_order_term(self, order_id: str, term_reference_id: str) -> dict:
+        endpoint = "/order/term/delete"
+        payload = {"order_id": order_id, "term_reference_id": term_reference_id}
+        return self._make_request("POST", endpoint, json_payload=payload)
 
     def update_order_term(self, term: OrderPaymentTermUpdateDTO) -> dict:
-        endpoint = "/order/term"
+        endpoint = "/order/term/update"
         payload = term.to_dict()
-        return self._make_request("PATCH", endpoint, json_payload=payload)
+        return self._make_request("POST", endpoint, json_payload=payload)
 
     def refund_order_term(self, term: OrderTermRefundRequest) -> dict:
         endpoint = "/order/term/refund"
@@ -197,20 +213,29 @@ class TapsilatAPI:
 
     def order_terminate(self, reference_id: str) -> dict:
         endpoint = "/order/terminate"
-        payload = {"reference_id":reference_id}
+        payload = {"reference_id": reference_id}
         return self._make_request("POST", endpoint, json_payload=payload)
 
     def order_manual_callback(self, reference_id: str, conversation_id: str) -> dict:
-        endpoint = "/order/callback"
-        payload = {"reference_id":reference_id, "conversation_id":conversation_id}
+        endpoint = "/order/manual-callback"
+        payload = {"reference_id": reference_id}
+        if conversation_id:
+            payload["conversation_id"] = conversation_id
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def order_related_update(self, reference_id: str, related_reference_id: str) -> dict:
-        endpoint = "/order/releated"
-        payload = {"reference_id":reference_id, "related_reference_id":related_reference_id}
+    def order_related_update(
+        self, reference_id: str, related_reference_id: str
+    ) -> dict:
+        endpoint = "/order/related-update"
+        payload = {
+            "reference_id": reference_id,
+            "related_reference_id": related_reference_id,
+        }
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def get_orders(self, page: str = "1", per_page: str = "10", buyer_id: str = "") -> dict:
+    def get_orders(
+        self, page: str = "1", per_page: str = "10", buyer_id: str = ""
+    ) -> dict:
         """Get orders with pagination and optional buyer filter"""
         endpoint = "/order/list"
         params = {"page": page, "per_page": per_page}
@@ -237,7 +262,9 @@ class TapsilatAPI:
         payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def create_subscription(self, request: SubscriptionCreateRequest) -> SubscriptionCreateResponse:
+    def create_subscription(
+        self, request: SubscriptionCreateRequest
+    ) -> SubscriptionCreateResponse:
         """Create a new subscription"""
         endpoint = "/subscription/create"
         payload = request.to_dict()
@@ -250,10 +277,11 @@ class TapsilatAPI:
         params = {"page": page, "per_page": per_page}
         return self._make_request("GET", endpoint, params=params)
 
-    def redirect_subscription(self, request: SubscriptionRedirectRequest) -> SubscriptionRedirectResponse:
+    def redirect_subscription(
+        self, request: SubscriptionRedirectRequest
+    ) -> SubscriptionRedirectResponse:
         """Get redirect URL for a subscription"""
         endpoint = "/subscription/redirect"
         payload = request.to_dict()
         response = self._make_request("POST", endpoint, json_payload=payload)
         return SubscriptionRedirectResponse(**response)
-

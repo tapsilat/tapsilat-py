@@ -1,5 +1,7 @@
 from typing import Any, Dict, Optional
 
+import hmac
+import hashlib
 import requests
 
 from .exceptions import APIException
@@ -285,3 +287,24 @@ class TapsilatAPI:
         payload = request.to_dict()
         response = self._make_request("POST", endpoint, json_payload=payload)
         return SubscriptionRedirectResponse(**response)
+
+    def terminate_order_term(self, term_reference_id: str, reason: str = "") -> dict:
+        """Terminate a payment term"""
+        endpoint = "/order/term/terminate"
+        payload = {"term_reference_id": term_reference_id}
+        if reason:
+            payload["reason"] = reason
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def health_check(self) -> dict:
+        """Check API health"""
+        endpoint = "/health"
+        return self._make_request("GET", endpoint)
+
+    @staticmethod
+    def verify_webhook(payload: str, signature: str, secret: str) -> bool:
+        """Verify webhook signature"""
+        expected_signature = hmac.new(
+            secret.encode(), payload.encode(), hashlib.sha256
+        ).hexdigest()
+        return f"sha256={expected_signature}" == signature

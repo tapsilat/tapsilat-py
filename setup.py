@@ -8,7 +8,7 @@ long_description = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="tapsilat-py",
-    version="2025.11.24.2",
+    version="2025.12.5.1",
     description="Client SDK for Tapsilat API",
     long_description=long_description,
     long_description_content_type="text/markdown",

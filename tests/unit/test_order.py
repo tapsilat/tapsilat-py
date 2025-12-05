@@ -807,6 +807,22 @@ def test_delete_order_term_failure(mock_api_request):
     assert e.value.error == api_error_content["error"]
 
 
+def test_terminate_order_term(mock_api_request):
+    term_reference_id = "term_ref_123"
+    reason = "cancellation reason"
+    expected_response = {"success": True}
+    mock_api_request.return_value = expected_response
+
+    client = TapsilatAPI()
+    result = client.terminate_order_term(term_reference_id, reason)
+
+    expected_payload = {"term_reference_id": term_reference_id, "reason": reason}
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/term/terminate", json_payload=expected_payload
+    )
+    assert result == expected_response
+
+
 def test_update_order_term_success(mock_api_request):
     payload_dto = OrderPaymentTermUpdateDTO(
         term_reference_id="term-to-update", amount=60, status="PENDING"

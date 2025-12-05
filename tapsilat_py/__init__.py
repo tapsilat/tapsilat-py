@@ -1,4 +1,4 @@
-__version__ = "2025.06.24.1"
+__version__ = "2025.12.5.1"
 
 from .client import TapsilatAPI
 from .exceptions import APIException
@@ -29,4 +29,3 @@ __all__ = [
     "SubscriptionRedirectResponse",
     "SubscriptionUser",
 ]
-

@@ -6,9 +6,11 @@ import requests
 
 from .exceptions import APIException
 from .models import (
+    OrderAccountingRequest,
     OrderCreateDTO,
     OrderPaymentTermCreateDTO,
     OrderPaymentTermUpdateDTO,
+    OrderPostAuthRequest,
     OrderResponse,
     OrderTermRefundRequest,
     RefundOrderDTO,
@@ -115,6 +117,20 @@ class TapsilatAPI:
                 pass
 
         return response
+
+    def order_accounting(self, request: OrderAccountingRequest) -> dict:
+        endpoint = "/order/accounting"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def order_postauth(self, request: OrderPostAuthRequest) -> dict:
+        endpoint = "/order/postauth"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def get_system_order_statuses(self) -> dict:
+        endpoint = "/system/order-statuses"
+        return self._make_request("GET", endpoint)
 
     def get_order(self, reference_id: str) -> OrderResponse:
         endpoint = f"/order/{reference_id}"

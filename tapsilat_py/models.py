@@ -6,7 +6,7 @@ def _asdict_factory(data):
     """Convert dataclass to dict, removing None values and handling nested dataclasses"""
     if not is_dataclass(data):
         return data
-    
+
     def convert_value(obj):
         if isinstance(obj, list):
             return [convert_value(v) for v in obj]
@@ -20,6 +20,7 @@ def _asdict_factory(data):
         if value is not None:
             result[field.name] = convert_value(value)
     return result
+
 
 @dataclass
 class BuyerDTO:
@@ -197,15 +198,44 @@ class OrderCreateDTO:
     partial_payment: Optional[bool] = None
     payment_failure_url: Optional[str] = None
     payment_methods: Optional[bool] = None
+    payment_mode: Optional[str] = None
     payment_options: Optional[List[str]] = None
     payment_success_url: Optional[str] = None
     payment_terms: Optional[List[PaymentTermDTO]] = None
     pf_sub_merchant: Optional[OrderPFSubMerchantDTO] = None
+    redirect_failure_url: Optional[str] = None
+    redirect_success_url: Optional[str] = None
     shipping_address: Optional[ShippingAddressDTO] = None
     sub_organization: Optional[SubOrganizationDTO] = None
     submerchants: Optional[List[SubmerchantDTO]] = None
     tax_amount: Optional[float] = None
     three_d_force: Optional[bool] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrderAccountingRequest:
+    order_reference_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrderPostAuthRequest:
+    amount: float
+    reference_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrderManualCallbackDTO:
+    reference_id: str
+    conversation_id: Optional[str] = None
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
@@ -236,6 +266,7 @@ class OrderPaymentTermCreateDTO:
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
+
 
 @dataclass
 class OrderPaymentTermUpdateDTO:

@@ -35,27 +35,15 @@ class BuyerDTO:
     identity_number: Optional[str] = None
     ip: Optional[str] = None
     last_login_date: Optional[str] = None
-    registration_address: Optional[str] = None
     registration_date: Optional[str] = None
     title: Optional[str] = None
     zip_code: Optional[str] = None
 
 
 @dataclass
-class BasketItemPayerDTO:
-    address: Optional[str] = None
-    reference_id: Optional[str] = None
-    tax_office: Optional[str] = None
-    title: Optional[str] = None
-    type: Optional[str] = None
-    vat: Optional[str] = None
-
-
-@dataclass
 class BasketItemDTO:
     category1: Optional[str] = None
     category2: Optional[str] = None
-    commission_amount: Optional[float] = None
     coupon: Optional[str] = None
     coupon_discount: Optional[float] = None
     data: Optional[str] = None
@@ -63,13 +51,7 @@ class BasketItemDTO:
     item_type: Optional[str] = None
     name: Optional[str] = None
     paid_amount: Optional[float] = None
-    payer: Optional[BasketItemPayerDTO] = None
     price: Optional[float] = None
-    quantity: Optional[int] = None
-    quantity_float: Optional[float] = None
-    quantity_unit: Optional[str] = None
-    sub_merchant_key: Optional[str] = None
-    sub_merchant_price: Optional[str] = None
 
 
 @dataclass
@@ -96,8 +78,6 @@ class CheckoutDesignDTO:
     left_background_color: Optional[str] = None
     logo: Optional[str] = None
     order_detail_html: Optional[str] = None
-    pay_button_color: Optional[str] = None
-    redirect_url: Optional[str] = None
     right_background_color: Optional[str] = None
     text_color: Optional[str] = None
 
@@ -128,18 +108,9 @@ class PaymentTermDTO:
 
 @dataclass
 class OrderPFSubMerchantDTO:
-    address: Optional[str] = None
-    city: Optional[str] = None
-    country: Optional[str] = None
-    country_iso_code: Optional[str] = None
-    id: Optional[str] = None
     mcc: Optional[str] = None
     name: Optional[str] = None
     org_id: Optional[str] = None
-    postal_code: Optional[str] = None
-    submerchant_nin: Optional[str] = None
-    submerchant_url: Optional[str] = None
-    terminal_no: Optional[str] = None
 
 
 @dataclass
@@ -181,6 +152,15 @@ class SubmerchantDTO:
 
 
 @dataclass
+class OrderConsent:
+    title: Optional[str] = None
+    url: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
 class OrderCreateDTO:
     amount: float
     currency: str
@@ -189,6 +169,7 @@ class OrderCreateDTO:
     basket_items: Optional[List[BasketItemDTO]] = None
     billing_address: Optional[BillingAddressDTO] = None
     checkout_design: Optional[CheckoutDesignDTO] = None
+    consents: Optional[List[OrderConsent]] = None
     conversation_id: Optional[str] = None
     enabled_installments: Optional[List[int]] = None
     external_reference_id: Optional[str] = None
@@ -253,6 +234,48 @@ class RefundOrderDTO:
 
 
 @dataclass
+class CancelOrderDTO:
+    reference_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class RefundAllOrderDTO:
+    reference_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrderPaymentDetailDTO:
+    reference_id: str
+    conversation_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class TerminateRequest:
+    reference_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrderRelatedReferenceDTO:
+    reference_id: str
+    related_reference_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
 class OrderPaymentTermCreateDTO:
     order_id: str
     term_reference_id: str
@@ -266,20 +289,6 @@ class OrderPaymentTermCreateDTO:
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
-
-
-@dataclass
-class OrderPaymentTermUpdateDTO:
-    term_reference_id: str
-    amount: Optional[float] = None
-    due_date: Optional[str] = None
-    paid_date: Optional[str] = None
-    required: Optional[bool] = None
-    status: Optional[str] = None
-    term_sequence: Optional[int] = None
-
-    def to_dict(self) -> dict:
-        return {k: v for k, v in asdict(self).items() if v is not None}
 
 
 @dataclass
@@ -363,6 +372,44 @@ class SubscriptionRedirectRequest:
 
 
 @dataclass
+class AddBasketItemRequest:
+    order_reference_id: str
+    basket_item: BasketItemDTO
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class RemoveBasketItemRequest:
+    order_reference_id: str
+    basket_item_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class UpdateBasketItemRequest:
+    order_reference_id: str
+    basket_item: BasketItemDTO
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class CallbackURLDTO:
+    callback_url: Optional[str] = None
+    cancel_callback_url: Optional[str] = None
+    fail_callback_url: Optional[str] = None
+    refund_callback_url: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
 class SubscriptionOrder:
     amount: Optional[str] = None
     currency: Optional[str] = None
@@ -370,46 +417,6 @@ class SubscriptionOrder:
     payment_url: Optional[str] = None
     reference_id: Optional[str] = None
     status: Optional[str] = None
-
-
-@dataclass
-class SubscriptionDetail:
-    amount: Optional[str] = None
-    currency: Optional[str] = None
-    due_date: Optional[str] = None
-    external_reference_id: Optional[str] = None
-    is_active: Optional[bool] = None
-    orders: Optional[List[SubscriptionOrder]] = None
-    payment_date: Optional[int] = None
-    payment_status: Optional[str] = None
-    period: Optional[int] = None
-    title: Optional[str] = None
-
-
-@dataclass
-class SubscriptionCreateResponse:
-    code: Optional[int] = None
-    message: Optional[str] = None
-    order_reference_id: Optional[str] = None
-    reference_id: Optional[str] = None
-
-
-@dataclass
-class SubscriptionListItem:
-    amount: Optional[str] = None
-    currency: Optional[str] = None
-    external_reference_id: Optional[str] = None
-    is_active: Optional[bool] = None
-    payment_date: Optional[int] = None
-    payment_status: Optional[str] = None
-    period: Optional[int] = None
-    reference_id: Optional[str] = None
-    title: Optional[str] = None
-
-
-@dataclass
-class SubscriptionRedirectResponse:
-    url: Optional[str] = None
 
 
 class OrderResponse(dict):
@@ -427,3 +434,104 @@ class OrderResponse(dict):
     @property
     def order_id(self) -> str:
         return self.get("order_id")
+
+@dataclass
+class OrderPaymentTermDeleteDTO:
+    order_id: str
+    term_reference_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrderPaymentTermUpdateDTO:
+    amount: float
+    due_date: str
+    paid_date: Optional[str]
+    required: bool
+    status: str
+    term_reference_id: str
+    term_sequence: int
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+class OrgCreateBusinessRequest_BusinessType:
+    INDIVIDUAL = 0
+    CORPORATE = 1
+
+@dataclass
+class OrgCreateBusinessRequest:
+    address: str
+    business_name: str
+    business_type: int
+    email: str
+    first_name: str
+    identity_number: str
+    last_name: str
+    phone: str
+    tax_number: str
+    tax_office: str
+    zip_code: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class GetUserLimitRequest:
+    user_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class SetLimitUserRequest:
+    limit_id: str
+    user_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class GetVposRequest:
+    currency_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrgCreateUserReq:
+    conversation_id: str
+    email: str
+    first_name: str
+    identity_number: str
+    is_mail_verified: bool
+    last_name: str
+    phone: str
+    reference_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrgUserVerifyReq:
+    user_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrgUserMobileVerifyReq:
+    user_id: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+

@@ -6,7 +6,6 @@ from tapsilat_py.client import TapsilatAPI
 from tapsilat_py.exceptions import APIException
 from tapsilat_py.models import (
     BasketItemDTO,
-    BasketItemPayerDTO,
     BillingAddressDTO,
     BuyerDTO,
     CheckoutDesignDTO,
@@ -18,6 +17,10 @@ from tapsilat_py.models import (
     SubscriptionGetRequest,
     SubscriptionRedirectRequest,
     SubscriptionUser,
+    OrderAccountingRequest,
+    OrderPostAuthRequest,
+    OrderPaymentDetailDTO,
+    CancelOrderDTO,
 )
 from tapsilat_py.validators import validate_gsm_number, validate_installments
 
@@ -41,32 +44,21 @@ def test_scenario_1_basic_order(api_client):
 
     response = api_client.create_order(order_payload)
     assert response.reference_id is not None
-    assert response.checkout_url is not None
 
 
 def test_scenario_2_order_with_basket_items(api_client):
     buyer_data = BuyerDTO(name="John", surname="Doe", email="test@example.com")
-    basket_item1_payer = BasketItemPayerDTO(
-        reference_id="payer_ref0_item1", type="PERSONAL"
-    )
     basket_item1 = BasketItemDTO(
         id="B001",
         name="Item 1",
         price=10.00,
-        quantity=1,
         item_type="PHYSICAL",
-        payer=basket_item1_payer,
-    )
-    basket_item2_payer = BasketItemPayerDTO(
-        reference_id="payer_ref1_item2", type="BUSINESS"
     )
     basket_item2 = BasketItemDTO(
         id="B002",
         name="Item 2",
         price=20.49,
-        quantity=2,
         item_type="PHYSICAL",
-        payer=basket_item2_payer,
     )
 
     order_payload = OrderCreateDTO(
@@ -132,7 +124,6 @@ def test_scenario_4_installments_and_payment_methods(api_client):
 def test_scenario_5_detailed_checkout_design_full(api_client):
     buyer = BuyerDTO(name="John", surname="Doe", email="test@example.com")
     design = CheckoutDesignDTO(
-        pay_button_color="#FF0000",
         logo="http://example.com/logo.png",
         input_background_color="#EEEEEE",
         input_text_color="#333333",
@@ -227,15 +218,13 @@ def test_scenario_10_subscription_lifecycle(api_client):
     )
 
     create_response = api_client.create_subscription(subscription_request)
-    assert create_response.reference_id is not None
-    sub_ref_id = create_response.reference_id
+    assert create_response.get("reference_id") is not None
+    sub_ref_id = create_response.get("reference_id")
 
     # Get Subscription
     get_request = SubscriptionGetRequest(reference_id=sub_ref_id)
     subscription = api_client.get_subscription(get_request)
-    # SubscriptionDetail does not have reference_id in Go SDK, so we don't check it here
-    # assert subscription.reference_id == sub_ref_id
-    assert subscription.title == "Monthly Subscription"
+    assert subscription.get("title") == "Monthly Subscription"
 
     # List Subscriptions
     subscriptions = api_client.list_subscriptions(page=1, per_page=10)
@@ -244,10 +233,88 @@ def test_scenario_10_subscription_lifecycle(api_client):
     # Redirect Subscription
     redirect_request = SubscriptionRedirectRequest(subscription_id=sub_ref_id)
     redirect_response = api_client.redirect_subscription(redirect_request)
-    assert redirect_response.url is not None
+    assert redirect_response.get("url") is not None
 
     # Cancel Subscription
     cancel_request = SubscriptionCancelRequest(reference_id=sub_ref_id)
     cancel_response = api_client.cancel_subscription(cancel_request)
     # Assuming cancel returns a dict with success or similar
     assert isinstance(cancel_response, dict)
+
+
+def test_scenario_11_order_operations_smoke(api_client):
+    """
+    A smoke test to ensure that the un-tested getter and setter endpoints in client.py
+    are structurally sound and do not raise unexpected local exceptions before HTTP.
+    Note: Real success depends on actual reference IDs which we don't always have,
+    so we might catch APIExceptions but their structure should be valid.
+    """
+    # get_system_order_statuses
+    try:
+        statuses = api_client.get_system_order_statuses()
+        assert isinstance(statuses, dict)
+    except APIException:
+        pass
+
+    # get_order_submerchants
+    try:
+        merchants = api_client.get_order_submerchants(page=1, per_page=10)
+        assert isinstance(merchants, dict)
+    except APIException:
+        pass
+
+    dummy_ref = "dummy_ref_123"
+
+    # get_order_by_conversation_id
+    try:
+        api_client.get_order_by_conversation_id(dummy_ref)
+    except APIException:
+        pass
+
+    # order_accounting
+    try:
+        api_client.order_accounting(
+            OrderAccountingRequest(order_reference_id=dummy_ref)
+        )
+    except APIException:
+        pass
+
+    # order_postauth
+    try:
+        api_client.order_postauth(
+            OrderPostAuthRequest(reference_id=dummy_ref, amount=10.0)
+        )
+    except APIException:
+        pass
+
+    # get_order_status
+    try:
+        api_client.get_order_status(dummy_ref)
+    except APIException:
+        pass
+
+    # get_order_transactions
+    try:
+        api_client.get_order_transactions(dummy_ref)
+    except APIException:
+        pass
+
+    # cancel_order
+    try:
+        api_client.cancel_order(CancelOrderDTO(reference_id=dummy_ref))
+    except APIException:
+        pass
+
+    # get_order_payment_details
+    try:
+        api_client.get_order_payment_details(
+            OrderPaymentDetailDTO(reference_id=dummy_ref)
+        )
+    except APIException:
+        pass
+
+    # get_order_payment_details_by_id
+    try:
+        api_client.get_order_payment_details_by_id(dummy_ref)
+    except APIException:
+        pass

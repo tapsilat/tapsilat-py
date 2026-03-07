@@ -22,14 +22,3 @@ class TestClient(unittest.TestCase):
 
         self.assertTrue(TapsilatAPI.verify_webhook(payload, signature, secret))
         self.assertFalse(TapsilatAPI.verify_webhook(payload, "sha256=invalid", secret))
-
-    def test_health_check(self):
-        expected_response = {"status": "healthy", "timestamp": "2023-10-27T10:00:00Z"}
-
-        # Mock _make_request
-        self.client._make_request = MagicMock(return_value=expected_response)
-
-        result = self.client.health_check()
-
-        self.client._make_request.assert_called_once_with("GET", "/health")
-        self.assertEqual(result, expected_response)

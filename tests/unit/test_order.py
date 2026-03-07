@@ -6,7 +6,6 @@ from tapsilat_py.client import TapsilatAPI
 from tapsilat_py.exceptions import APIException
 from tapsilat_py.models import (
     BasketItemDTO,
-    BasketItemPayerDTO,
     BillingAddressDTO,
     BuyerDTO,
     CheckoutDesignDTO,
@@ -14,7 +13,6 @@ from tapsilat_py.models import (
     OrderCardDTO,
     OrderCreateDTO,
     OrderPaymentTermCreateDTO,
-    OrderPaymentTermUpdateDTO,
     OrderPFSubMerchantDTO,
     OrderResponse,
     PaymentTermDTO,
@@ -22,6 +20,12 @@ from tapsilat_py.models import (
     ShippingAddressDTO,
     SubmerchantDTO,
     SubOrganizationDTO,
+    CancelOrderDTO,
+    RefundAllOrderDTO,
+    OrderPaymentDetailDTO,
+    TerminateRequest,
+    OrderManualCallbackDTO,
+    OrderRelatedReferenceDTO,
 )
 
 
@@ -48,35 +52,18 @@ def test_order_to_dict():
     assert json_data["buyer"]["email"] == "test@example.com"
 
 
-def test_basket_item_payer_dto_asdict():
-    payer = BasketItemPayerDTO(
-        address="uskudar", type="PERSONAL", reference_id="123456789"
-    )
-    payer_dict = asdict(payer)
-    assert payer_dict["address"] == "uskudar"
-    assert payer_dict["type"] == "PERSONAL"
-    assert payer_dict["reference_id"] == "123456789"
-    assert payer_dict["tax_office"] is None
-
-
 def test_basket_item_dto_asdict():
-    payer_data = BasketItemPayerDTO(address="uskudar", type="BUSINESS")
     item = BasketItemDTO(
         id="BI101",
         name="Binocular",
         price=19.99,
-        quantity=1,
         item_type="PHYSICAL",
-        payer=payer_data,
     )
     item_dict = asdict(item)
     assert item_dict["id"] == "BI101"
     assert item_dict["name"] == "Binocular"
     assert item_dict["price"] == 19.99
-    assert item_dict["quantity"] == 1
     assert item_dict["item_type"] == "PHYSICAL"
-    assert item_dict["payer"]["address"] == "uskudar"
-    assert item_dict["payer"]["type"] == "BUSINESS"
     assert item_dict["category1"] is None
 
 
@@ -93,11 +80,8 @@ def test_billing_address_dto_asdict():
 
 
 def test_checkout_design_dto_asdict():
-    design = CheckoutDesignDTO(
-        pay_button_color="#FF0000", logo="http://example.com/logo.png"
-    )
+    design = CheckoutDesignDTO(logo="http://example.com/logo.png")
     design_dict = asdict(design)
-    assert design_dict["pay_button_color"] == "#FF0000"
     assert design_dict["logo"] == "http://example.com/logo.png"
     assert design_dict["input_background_color"] is None
 
@@ -129,12 +113,11 @@ def test_payment_term_dto_asdict():
 
 
 def test_order_pf_sub_merchant_dto_asdict():
-    pf_sub = OrderPFSubMerchantDTO(id="123456789", name="John Doe", mcc="1234")
+    pf_sub = OrderPFSubMerchantDTO(name="John Doe", mcc="1234")
     pf_sub_dict = asdict(pf_sub)
-    assert pf_sub_dict["id"] == "123456789"
     assert pf_sub_dict["name"] == "John Doe"
     assert pf_sub_dict["mcc"] == "1234"
-    assert pf_sub_dict["address"] is None
+    assert "id" not in pf_sub_dict
 
 
 def test_shipping_address_dto_asdict():
@@ -207,9 +190,6 @@ def test_create_order_success(mock_api_request, mocker):
         locale="tr",
         buyer=buyer,
     )
-    mock_get_checkout_url = mocker.patch.object(TapsilatAPI, "get_checkout_url")
-    mock_get_checkout_url.return_value = "http://checkout.url"
-
     client = TapsilatAPI()
     order_response_obj = client.create_order(order_payload_dto)
 
@@ -219,7 +199,6 @@ def test_create_order_success(mock_api_request, mocker):
     assert isinstance(order_response_obj, OrderResponse)
     assert order_response_obj.order_id == expected_api_json_response["order_id"]
     assert order_response_obj.reference_id == expected_api_json_response["reference_id"]
-    assert order_response_obj.checkout_url == "http://checkout.url"
 
 
 def test_create_order_with_basket_items(mock_api_request, mocker):
@@ -230,16 +209,11 @@ def test_create_order_with_basket_items(mock_api_request, mocker):
     mock_api_request.return_value = expected_api_json_response
 
     buyer_data = BuyerDTO(name="Test", surname="User")
-    basket_item1_payer = BasketItemPayerDTO(reference_id="payer_ref0_item1")
-    basket_item1 = BasketItemDTO(
-        id="B001", name="Item 1", price=10.0, quantity=1, payer=basket_item1_payer
-    )
+    basket_item1 = BasketItemDTO(id="B001", name="Item 1", price=10.0)
     basket_item2 = BasketItemDTO(
         id="B002",
         name="Item 2",
         price=20.49,
-        quantity=2,
-        payer=BasketItemPayerDTO(reference_id="payer_ref1_item2"),
     )
 
     order_payload_dto = OrderCreateDTO(
@@ -250,9 +224,6 @@ def test_create_order_with_basket_items(mock_api_request, mocker):
         basket_items=[basket_item1, basket_item2],
     )
     client = TapsilatAPI()
-
-    mock_get_checkout_url = mocker.patch.object(TapsilatAPI, "get_checkout_url")
-    mock_get_checkout_url.return_value = "http://checkout.url"
 
     api_response = client.create_order(order_payload_dto)
 
@@ -416,12 +387,12 @@ def test_cancel_order_not_found(mock_api_request):
     )
 
     client = TapsilatAPI()
+    request_dto = CancelOrderDTO(reference_id=reference_id)
     with pytest.raises(APIException) as e:
-        client.cancel_order(reference_id)
+        client.cancel_order(request_dto)
 
-    expected_payload = {"reference_id": reference_id}
     mock_api_request.assert_called_once_with(
-        "POST", "/order/cancel", json_payload=expected_payload
+        "POST", "/order/cancel", json_payload=request_dto.to_dict()
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
@@ -438,11 +409,11 @@ def test_cancel_order_success(mock_api_request):
     mock_api_request.return_value = expected_api_json_response
 
     client = TapsilatAPI()
-    api_response = client.cancel_order(reference_id)
+    request_dto = CancelOrderDTO(reference_id=reference_id)
+    api_response = client.cancel_order(request_dto)
 
-    expected_payload = {"reference_id": reference_id}
     mock_api_request.assert_called_once_with(
-        "POST", "/order/cancel", json_payload=expected_payload
+        "POST", "/order/cancel", json_payload=request_dto.to_dict()
     )
     assert api_response == expected_api_json_response
 
@@ -488,11 +459,11 @@ def test_refund_all_order_success(mock_api_request):
     mock_api_request.return_value = expected_api_json_response
 
     client = TapsilatAPI()
-    api_response = client.refund_all_order(reference_id)
+    request_dto = RefundAllOrderDTO(reference_id=reference_id)
+    api_response = client.refund_all_order(request_dto)
 
-    expected_payload = {"reference_id": reference_id}
     mock_api_request.assert_called_once_with(
-        "POST", "/order/refund-all", json_payload=expected_payload
+        "POST", "/order/refund-all", json_payload=request_dto.to_dict()
     )
     assert api_response == expected_api_json_response
 
@@ -507,12 +478,12 @@ def test_refund_all_order_failure(mock_api_request):
     )
 
     client = TapsilatAPI()
+    request_dto = RefundAllOrderDTO(reference_id=reference_id)
     with pytest.raises(APIException) as e:
-        client.refund_all_order(reference_id)
+        client.refund_all_order(request_dto)
 
-    expected_payload = {"reference_id": reference_id}
     mock_api_request.assert_called_once_with(
-        "POST", "/order/refund-all", json_payload=expected_payload
+        "POST", "/order/refund-all", json_payload=request_dto.to_dict()
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
@@ -525,7 +496,7 @@ def test_get_order_payment_details_success_with_ref_id(mock_api_request):
     mock_api_request.return_value = expected_response
 
     client = TapsilatAPI()
-    result = client.get_order_payment_details(reference_id=reference_id)
+    result = client.get_order_payment_details_by_id(reference_id=reference_id)
 
     mock_api_request.assert_called_once_with(
         "GET", f"/order/{reference_id}/payment-details"
@@ -540,16 +511,13 @@ def test_get_order_payment_details_success_with_conv_id(mock_api_request):
     mock_api_request.return_value = expected_response
 
     client = TapsilatAPI()
-    result = client.get_order_payment_details(
+    request_dto = OrderPaymentDetailDTO(
         reference_id=reference_id, conversation_id=conversation_id
     )
+    result = client.get_order_payment_details(request_dto)
 
-    expected_payload = {
-        "conversation_id": conversation_id,
-        "reference_id": reference_id,
-    }
     mock_api_request.assert_called_once_with(
-        "POST", "/order/payment-details", json_payload=expected_payload
+        "POST", "/order/payment-details", json_payload=request_dto.to_dict()
     )
     assert result == expected_response
 
@@ -568,7 +536,7 @@ def test_get_order_payment_details_not_found(mock_api_request):
 
     client = TapsilatAPI()
     with pytest.raises(APIException) as e:
-        client.get_order_payment_details(reference_id=reference_id)
+        client.get_order_payment_details_by_id(reference_id=reference_id)
 
     mock_api_request.assert_called_once_with(
         "GET", f"/order/{reference_id}/payment-details"
@@ -642,42 +610,6 @@ def test_get_order_transactions_not_found(mock_api_request):
     mock_api_request.assert_called_once_with(
         "GET", f"/order/{reference_id}/transactions"
     )
-    assert e.value.status_code == 400
-    assert e.value.code == api_error_content["code"]
-    assert e.value.error == api_error_content["error"]
-
-
-def test_get_order_term_success(mock_api_request):
-    term_reference_id = "mock-term-ref-id"
-    expected_response = {
-        "term_sequence": 1,
-        "amount": 100,
-        "status": "PENDING",
-        "due_date": {"seconds": 1760486400},
-    }
-    mock_api_request.return_value = expected_response
-
-    client = TapsilatAPI()
-    result = client.get_order_term(term_reference_id)
-
-    mock_api_request.assert_called_once_with("GET", f"/order/term/{term_reference_id}")
-    assert result == expected_response
-
-
-def test_get_order_term_failure(mock_api_request):
-    term_reference_id = "mock-none-term-ref-id"
-    api_error_content = {"code": 313010, "error": "ORDER_GET_PAYMENT_TERM_NOT_FOUND"}
-    mock_api_request.side_effect = APIException(
-        status_code=400,
-        code=api_error_content["code"],
-        error=api_error_content["error"],
-    )
-
-    client = TapsilatAPI()
-    with pytest.raises(APIException) as e:
-        client.get_order_term(term_reference_id)
-
-    mock_api_request.assert_called_once_with("GET", f"/order/term/{term_reference_id}")
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
     assert e.value.error == api_error_content["error"]
@@ -766,102 +698,6 @@ def test_create_order_term_failure_status_invalid(mock_api_request):
     assert e.value.error == api_error_content["error"]
 
 
-def test_delete_order_term_success(mock_api_request):
-    order_id = "mock-order-id"
-    term_reference_id = "mock-none-term-id"
-    expected_response = {"code": 156090, "message": "ORDER_REMOVE_PAYMENT_TERM_SUCCESS"}
-    mock_api_request.return_value = expected_response
-
-    client = TapsilatAPI()
-    result = client.delete_order_term(order_id, term_reference_id)
-
-    mock_api_request.assert_called_once_with(
-        "POST",
-        "/order/term/delete",
-        json_payload={"order_id": order_id, "term_reference_id": term_reference_id},
-    )
-    assert result == expected_response
-
-
-def test_delete_order_term_failure(mock_api_request):
-    order_id = "mock-order-id"
-    term_reference_id = "mock-none-term-id"
-    api_error_content = {"code": 156070, "error": "ORDER_REMOVE_PAYMENT_TERM_NOT_FOUND"}
-    mock_api_request.side_effect = APIException(
-        status_code=400,
-        code=api_error_content["code"],
-        error=api_error_content["error"],
-    )
-
-    client = TapsilatAPI()
-    with pytest.raises(APIException) as e:
-        client.delete_order_term(order_id, term_reference_id)
-
-    mock_api_request.assert_called_once_with(
-        "POST",
-        "/order/term/delete",
-        json_payload={"order_id": order_id, "term_reference_id": term_reference_id},
-    )
-    assert e.value.status_code == 400
-    assert e.value.code == api_error_content["code"]
-    assert e.value.error == api_error_content["error"]
-
-
-def test_terminate_order_term(mock_api_request):
-    term_reference_id = "term_ref_123"
-    reason = "cancellation reason"
-    expected_response = {"success": True}
-    mock_api_request.return_value = expected_response
-
-    client = TapsilatAPI()
-    result = client.terminate_order_term(term_reference_id, reason)
-
-    expected_payload = {"term_reference_id": term_reference_id, "reason": reason}
-    mock_api_request.assert_called_once_with(
-        "POST", "/order/term/terminate", json_payload=expected_payload
-    )
-    assert result == expected_response
-
-
-def test_update_order_term_success(mock_api_request):
-    payload_dto = OrderPaymentTermUpdateDTO(
-        term_reference_id="term-to-update", amount=60, status="PENDING"
-    )
-    expected_response = {"message": "ORDER_UPDATE_PAYMENT_TERM_SUCCESS", "code": 156130}
-    mock_api_request.return_value = expected_response
-
-    client = TapsilatAPI()
-    result = client.update_order_term(payload_dto)
-
-    mock_api_request.assert_called_once_with(
-        "POST", "/order/term/update", json_payload=payload_dto.to_dict()
-    )
-    assert result == expected_response
-
-
-def test_update_order_term_not_found(mock_api_request):
-    payload_dto = OrderPaymentTermUpdateDTO(
-        term_reference_id="mock-term-id", amount=120
-    )
-    api_error_content = {"code": 156110, "error": "ORDER_UPDATE_PAYMENT_TERM_NOT_FOUND"}
-    mock_api_request.side_effect = APIException(
-        status_code=400,
-        code=api_error_content["code"],
-        error=api_error_content["error"],
-    )
-
-    client = TapsilatAPI()
-    with pytest.raises(APIException) as e:
-        client.update_order_term(payload_dto)
-
-    mock_api_request.assert_called_once_with(
-        "POST", "/order/term/update", json_payload=payload_dto.to_dict()
-    )
-    assert e.value.status_code == 400
-    assert e.value.code == api_error_content["code"]
-    assert e.value.error == api_error_content["error"]
-
-
 def test_order_terminate_order_not_found(mock_api_request):
     reference_id = "mock-reference-id"
     api_error_content = {"code": 338000, "error": "ORDER_TERMINATE_ORDER_NOT_FOUND"}
@@ -872,11 +708,12 @@ def test_order_terminate_order_not_found(mock_api_request):
     )
 
     client = TapsilatAPI()
+    request_dto = TerminateRequest(reference_id=reference_id)
     with pytest.raises(APIException) as e:
-        client.order_terminate(reference_id)
+        client.terminate_order(request_dto)
 
     mock_api_request.assert_called_once_with(
-        "POST", "/order/terminate", json_payload={"reference_id": reference_id}
+        "POST", "/order/terminate", json_payload=request_dto.to_dict()
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
@@ -889,10 +726,11 @@ def test_order_terminate_order_success(mock_api_request):
     mock_api_request.return_value = expected_response
 
     client = TapsilatAPI()
-    result = client.order_terminate(reference_id)
+    request_dto = TerminateRequest(reference_id=reference_id)
+    result = client.terminate_order(request_dto)
 
     mock_api_request.assert_called_once_with(
-        "POST", "/order/terminate", json_payload={"reference_id": reference_id}
+        "POST", "/order/terminate", json_payload=request_dto.to_dict()
     )
     assert result == expected_response
 
@@ -908,13 +746,16 @@ def test_order_callback_failed(mock_api_request):
     )
 
     client = TapsilatAPI()
+    request_dto = OrderManualCallbackDTO(
+        reference_id=reference_id, conversation_id=conversation_id
+    )
     with pytest.raises(APIException) as e:
-        client.order_manual_callback(reference_id, conversation_id)
+        client.manual_callback(request_dto)
 
     mock_api_request.assert_called_once_with(
         "POST",
-        "/order/manual-callback",
-        json_payload={"reference_id": reference_id, "conversation_id": conversation_id},
+        "/order/callback",
+        json_payload=request_dto.to_dict(),
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
@@ -928,12 +769,15 @@ def test_order_callback_order_success(mock_api_request):
     mock_api_request.return_value = expected_response
 
     client = TapsilatAPI()
-    result = client.order_manual_callback(reference_id, conversation_id)
+    request_dto = OrderManualCallbackDTO(
+        reference_id=reference_id, conversation_id=conversation_id
+    )
+    result = client.manual_callback(request_dto)
 
     mock_api_request.assert_called_once_with(
         "POST",
-        "/order/manual-callback",
-        json_payload={"reference_id": reference_id, "conversation_id": conversation_id},
+        "/order/callback",
+        json_payload=request_dto.to_dict(),
     )
     assert result == expected_response
 
@@ -949,16 +793,16 @@ def test_order_related_update_not_found(mock_api_request):
     )
 
     client = TapsilatAPI()
+    request_dto = OrderRelatedReferenceDTO(
+        reference_id=reference_id, related_reference_id=related_reference_id
+    )
     with pytest.raises(APIException) as e:
-        client.order_related_update(reference_id, related_reference_id)
+        client.related_update(request_dto)
 
     mock_api_request.assert_called_once_with(
-        "POST",
-        "/order/related-update",
-        json_payload={
-            "reference_id": reference_id,
-            "related_reference_id": related_reference_id,
-        },
+        "PATCH",
+        "/order/releated",
+        json_payload=request_dto.to_dict(),
     )
     assert e.value.status_code == 400
     assert e.value.code == api_error_content["code"]
@@ -976,15 +820,15 @@ def test_order_related_update_success(mock_api_request):
     mock_api_request.return_value = expected_response
 
     client = TapsilatAPI()
-    result = client.order_related_update(reference_id, related_reference_id)
+    request_dto = OrderRelatedReferenceDTO(
+        reference_id=reference_id, related_reference_id=related_reference_id
+    )
+    result = client.related_update(request_dto)
 
     mock_api_request.assert_called_once_with(
-        "POST",
-        "/order/related-update",
-        json_payload={
-            "reference_id": reference_id,
-            "related_reference_id": related_reference_id,
-        },
+        "PATCH",
+        "/order/releated",
+        json_payload=request_dto.to_dict(),
     )
     assert result == expected_response
 

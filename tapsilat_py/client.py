@@ -9,18 +9,33 @@ from .models import (
     OrderAccountingRequest,
     OrderCreateDTO,
     OrderPaymentTermCreateDTO,
-    OrderPaymentTermUpdateDTO,
     OrderPostAuthRequest,
     OrderResponse,
     OrderTermRefundRequest,
     RefundOrderDTO,
+    CancelOrderDTO,
+    RefundAllOrderDTO,
+    OrderPaymentDetailDTO,
+    TerminateRequest,
+    OrderRelatedReferenceDTO,
+    OrderPaymentTermDeleteDTO,
+    OrderPaymentTermUpdateDTO,
+    OrgCreateBusinessRequest,
+    GetUserLimitRequest,
+    SetLimitUserRequest,
+    GetVposRequest,
+    OrgCreateUserReq,
+    OrgUserVerifyReq,
+    OrgUserMobileVerifyReq,
+    OrderManualCallbackDTO,
     SubscriptionCancelRequest,
     SubscriptionCreateRequest,
-    SubscriptionCreateResponse,
-    SubscriptionDetail,
     SubscriptionGetRequest,
     SubscriptionRedirectRequest,
-    SubscriptionRedirectResponse,
+    AddBasketItemRequest,
+    RemoveBasketItemRequest,
+    UpdateBasketItemRequest,
+    CallbackURLDTO,
 )
 from .validators import validate_gsm_number, validate_installments
 
@@ -108,14 +123,6 @@ class TapsilatAPI:
         response_data = self._make_request("POST", endpoint, json_payload=payload)
         response = OrderResponse(response_data)
 
-        if response.reference_id:
-            try:
-                checkout_url = self.get_checkout_url(response.reference_id)
-                if checkout_url:
-                    response["checkout_url"] = checkout_url
-            except Exception:
-                pass
-
         return response
 
     def order_accounting(self, request: OrderAccountingRequest) -> dict:
@@ -172,9 +179,9 @@ class TapsilatAPI:
         response = self.get_order(reference_id)
         return response.checkout_url
 
-    def cancel_order(self, reference_id: str) -> dict:
+    def cancel_order(self, request: CancelOrderDTO) -> dict:
         endpoint = "/order/cancel"
-        payload = {"reference_id": reference_id}
+        payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
     def refund_order(self, refund_data: RefundOrderDTO) -> dict:
@@ -182,18 +189,17 @@ class TapsilatAPI:
         payload = refund_data.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def refund_all_order(self, reference_id: str) -> dict:
+    def refund_all_order(self, request: RefundAllOrderDTO) -> dict:
         endpoint = "/order/refund-all"
-        payload = {"reference_id": reference_id}
+        payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def get_order_payment_details(
-        self, reference_id: str, conversation_id: str = ""
-    ) -> dict:
-        if conversation_id != "":
-            endpoint = "/order/payment-details"
-            payload = {"conversation_id": conversation_id, "reference_id": reference_id}
-            return self._make_request("POST", endpoint, json_payload=payload)
+    def get_order_payment_details(self, request: OrderPaymentDetailDTO) -> dict:
+        endpoint = "/order/payment-details"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def get_order_payment_details_by_id(self, reference_id: str) -> dict:
         endpoint = f"/order/{reference_id}/payment-details"
         return self._make_request("GET", endpoint)
 
@@ -205,51 +211,60 @@ class TapsilatAPI:
         endpoint = f"/order/{reference_id}/transactions"
         return self._make_request("GET", endpoint)
 
-    def get_order_term(self, term_reference_id: str) -> dict:
-        endpoint = f"/order/term/{term_reference_id}"
-        return self._make_request("GET", endpoint)
-
     def create_order_term(self, term: OrderPaymentTermCreateDTO) -> dict:
         endpoint = "/order/term"
         payload = term.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def delete_order_term(self, order_id: str, term_reference_id: str) -> dict:
-        endpoint = "/order/term/delete"
-        payload = {"order_id": order_id, "term_reference_id": term_reference_id}
-        return self._make_request("POST", endpoint, json_payload=payload)
+    def delete_order_term(self, request: OrderPaymentTermDeleteDTO) -> dict:
+        endpoint = "/order/term"
+        payload = request.to_dict()
+        return self._make_request("DELETE", endpoint, json_payload=payload)
 
-    def update_order_term(self, term: OrderPaymentTermUpdateDTO) -> dict:
-        endpoint = "/order/term/update"
-        payload = term.to_dict()
-        return self._make_request("POST", endpoint, json_payload=payload)
+    def update_order_term(self, request: OrderPaymentTermUpdateDTO) -> dict:
+        endpoint = "/order/term"
+        payload = request.to_dict()
+        return self._make_request("PATCH", endpoint, json_payload=payload)
+
+    def get_order_term(self, term_reference_id: str) -> dict:
+        endpoint = "/order/term"
+        params = {"term_reference_id": term_reference_id}
+        return self._make_request("GET", endpoint, params=params)
 
     def refund_order_term(self, term: OrderTermRefundRequest) -> dict:
         endpoint = "/order/term/refund"
         payload = term.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def order_terminate(self, reference_id: str) -> dict:
+    def terminate_order(self, request: TerminateRequest) -> dict:
         endpoint = "/order/terminate"
-        payload = {"reference_id": reference_id}
+        payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def order_manual_callback(self, reference_id: str, conversation_id: str) -> dict:
-        endpoint = "/order/manual-callback"
-        payload = {"reference_id": reference_id}
-        if conversation_id:
-            payload["conversation_id"] = conversation_id
+    def manual_callback(self, request: OrderManualCallbackDTO) -> dict:
+        endpoint = "/order/callback"
+        payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def order_related_update(
-        self, reference_id: str, related_reference_id: str
-    ) -> dict:
-        endpoint = "/order/related-update"
-        payload = {
-            "reference_id": reference_id,
-            "related_reference_id": related_reference_id,
-        }
+    def related_update(self, request: OrderRelatedReferenceDTO) -> dict:
+        endpoint = "/order/releated"
+        payload = request.to_dict()
+        return self._make_request("PATCH", endpoint, json_payload=payload)
+
+    def add_basket_item(self, request: AddBasketItemRequest) -> dict:
+        endpoint = "/order/basket-item"
+        payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
+
+    def remove_basket_item(self, request: RemoveBasketItemRequest) -> dict:
+        endpoint = "/order/basket-item"
+        payload = request.to_dict()
+        return self._make_request("DELETE", endpoint, json_payload=payload)
+
+    def update_basket_item(self, request: UpdateBasketItemRequest) -> dict:
+        endpoint = "/order/basket-item"
+        payload = request.to_dict()
+        return self._make_request("PATCH", endpoint, json_payload=payload)
 
     def get_orders(
         self, page: str = "1", per_page: str = "10", buyer_id: str = ""
@@ -266,13 +281,93 @@ class TapsilatAPI:
         endpoint = "/organization/settings"
         return self._make_request("GET", endpoint)
 
+    def get_organization_callback(self) -> dict:
+        """Get organization webhook callback URLs"""
+        endpoint = "/organization/callback"
+        return self._make_request("GET", endpoint)
+
+    def update_organization_callback(self, request: CallbackURLDTO) -> dict:
+        """Update organization webhook callback URLs"""
+        endpoint = "/organization/callback"
+        payload = request.to_dict()
+        return self._make_request("PATCH", endpoint, json_payload=payload)
+
+    def create_organization_business(self, request: OrgCreateBusinessRequest) -> dict:
+        """Create Business Entity"""
+        endpoint = "/organization/business/create"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def get_organization_currencies(self) -> dict:
+        """List Supported Currencies"""
+        endpoint = "/organization/currencies"
+        return self._make_request("GET", endpoint)
+
+    def get_organization_limit_user(self, request: GetUserLimitRequest) -> dict:
+        """Get User Limits Configuration"""
+        endpoint = "/organization/limit/user"
+        payload = request.to_dict()
+        return self._make_request("GET", endpoint, json_payload=payload)
+
+    def set_organization_limit_user(self, request: SetLimitUserRequest) -> dict:
+        """Set Limit To User"""
+        endpoint = "/organization/limit/user"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def get_organization_limits(self) -> dict:
+        """Get Organization Transaction Limits"""
+        endpoint = "/organization/limits"
+        return self._make_request("GET", endpoint)
+
+    def list_organization_vpos(self, request: GetVposRequest) -> dict:
+        """List Virtual POS Terminals"""
+        endpoint = "/organization/list-vpos"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def get_organization_meta(self, name: str) -> dict:
+        """Get Organization Metadata"""
+        endpoint = f"/organization/meta/{name}"
+        return self._make_request("GET", endpoint)
+
+    def get_organization_scopes(self) -> dict:
+        """Get Organization Permissions"""
+        endpoint = "/organization/scopes"
+        return self._make_request("GET", endpoint)
+
+    def get_organization_suborganizations(
+        self, page: int = 1, per_page: int = 10
+    ) -> dict:
+        """List Sub-Organizations"""
+        endpoint = "/organization/suborganizations"
+        params = {"page": page, "per_page": per_page}
+        return self._make_request("GET", endpoint, params=params)
+
+    def create_organization_user(self, request: OrgCreateUserReq) -> dict:
+        """Create Organization User"""
+        endpoint = "/organization/user/create"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def verify_organization_user(self, request: OrgUserVerifyReq) -> dict:
+        """Verify User"""
+        endpoint = "/organization/user/verify"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def verify_organization_user_mobile(self, request: OrgUserMobileVerifyReq) -> dict:
+        """Verify User Mobile"""
+        endpoint = "/organization/user/verify-mobile"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
     # Subscription methods
-    def get_subscription(self, request: SubscriptionGetRequest) -> SubscriptionDetail:
+    def get_subscription(self, request: SubscriptionGetRequest) -> dict:
         """Get subscription details by reference_id or external_reference_id"""
         endpoint = "/subscription"
         payload = request.to_dict()
-        response = self._make_request("POST", endpoint, json_payload=payload)
-        return SubscriptionDetail(**response)
+        return self._make_request("POST", endpoint, json_payload=payload)
 
     def cancel_subscription(self, request: SubscriptionCancelRequest) -> dict:
         """Cancel a subscription by reference_id or external_reference_id"""
@@ -280,14 +375,11 @@ class TapsilatAPI:
         payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def create_subscription(
-        self, request: SubscriptionCreateRequest
-    ) -> SubscriptionCreateResponse:
+    def create_subscription(self, request: SubscriptionCreateRequest) -> dict:
         """Create a new subscription"""
         endpoint = "/subscription/create"
         payload = request.to_dict()
-        response = self._make_request("POST", endpoint, json_payload=payload)
-        return SubscriptionCreateResponse(**response)
+        return self._make_request("POST", endpoint, json_payload=payload)
 
     def list_subscriptions(self, page: int = 1, per_page: int = 10) -> dict:
         """List all subscriptions with pagination"""
@@ -295,27 +387,11 @@ class TapsilatAPI:
         params = {"page": page, "per_page": per_page}
         return self._make_request("GET", endpoint, params=params)
 
-    def redirect_subscription(
-        self, request: SubscriptionRedirectRequest
-    ) -> SubscriptionRedirectResponse:
+    def redirect_subscription(self, request: SubscriptionRedirectRequest) -> dict:
         """Get redirect URL for a subscription"""
         endpoint = "/subscription/redirect"
         payload = request.to_dict()
-        response = self._make_request("POST", endpoint, json_payload=payload)
-        return SubscriptionRedirectResponse(**response)
-
-    def terminate_order_term(self, term_reference_id: str, reason: str = "") -> dict:
-        """Terminate a payment term"""
-        endpoint = "/order/term/terminate"
-        payload = {"term_reference_id": term_reference_id}
-        if reason:
-            payload["reason"] = reason
         return self._make_request("POST", endpoint, json_payload=payload)
-
-    def health_check(self) -> dict:
-        """Check API health"""
-        endpoint = "/health"
-        return self._make_request("GET", endpoint)
 
     @staticmethod
     def verify_webhook(payload: str, signature: str, secret: str) -> bool:

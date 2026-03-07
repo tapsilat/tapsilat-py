@@ -5,9 +5,6 @@ from tapsilat_py.models import (
     SubscriptionCancelRequest,
     SubscriptionCreateRequest,
     SubscriptionRedirectRequest,
-    SubscriptionDetail,
-    SubscriptionCreateResponse,
-    SubscriptionRedirectResponse,
 )
 
 
@@ -33,9 +30,9 @@ def test_get_subscription(mock_api_request):
     mock_api_request.assert_called_once_with(
         "POST", "/subscription", json_payload=request.to_dict()
     )
-    assert isinstance(result, SubscriptionDetail)
-    assert result.external_reference_id == "ext-ref-123"
-    assert result.is_active is True
+    assert isinstance(result, dict)
+    assert result["external_reference_id"] == "ext-ref-123"
+    assert result["is_active"] is True
 
 
 def test_cancel_subscription(mock_api_request):
@@ -72,8 +69,8 @@ def test_create_subscription(mock_api_request):
     mock_api_request.assert_called_once_with(
         "POST", "/subscription/create", json_payload=request.to_dict()
     )
-    assert isinstance(result, SubscriptionCreateResponse)
-    assert result.reference_id == "sub-ref-new"
+    assert isinstance(result, dict)
+    assert result["reference_id"] == "sub-ref-new"
 
 
 def test_list_subscriptions(mock_api_request):
@@ -100,5 +97,5 @@ def test_redirect_subscription(mock_api_request):
     mock_api_request.assert_called_once_with(
         "POST", "/subscription/redirect", json_payload=request.to_dict()
     )
-    assert isinstance(result, SubscriptionRedirectResponse)
-    assert result.url == "https://redirect.example.com"
+    assert isinstance(result, dict)
+    assert result["url"] == "https://redirect.example.com"

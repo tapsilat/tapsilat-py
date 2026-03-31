@@ -1,4 +1,4 @@
-__version__ = "2025.12.8.1"
+__version__ = "2026.3.31.1"
 
 from .client import TapsilatAPI
 from .exceptions import APIException

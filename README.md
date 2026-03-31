@@ -230,10 +230,83 @@ orders = client.get_orders(page="1", per_page="10")
 orders = client.get_orders(page="1", per_page="10", buyer_id="buyer_123")
 ```
 
-### Get Organization Settings
+## Organization Management
+
+### Get Settings
 ```python
 settings = client.get_organization_settings()
-print(f"Organization settings: {settings}")
+```
+
+### Callback URL Configuration
+```python
+# Get callback settings
+callbacks = client.get_callback_settings()
+
+# Update callback settings
+client.update_callback_settings(
+    success_url="https://example.com/success",
+    fail_url="https://example.com/fail"
+)
+```
+
+### Business and Currency
+```python
+# Get currencies
+currencies = client.get_currencies()
+
+# Get VPOS list
+vpos_list = client.get_vpos_list()
+
+# Get Meta data
+meta_info = client.get_meta()
+```
+
+### User Management
+```python
+# Create user
+client.create_user(
+    email="test@example.com", 
+    first_name="John", 
+    last_name="Doe", 
+    phone="+905551234567"
+)
+
+# Verify User Mobile
+client.verify_user_mobile(user_id="user-123", code="123456")
+
+# Verify User Email
+client.verify_user_email(user_id="user-123", code="123456")
+```
+
+### Limits
+```python
+# Get Limits for a currency
+limits = client.get_limits("TRY")
+
+# Set Limits
+client.set_limits([
+    {
+        "currency": "TRY", 
+        "min_amount": 10, 
+        "max_amount": 50000
+    }
+])
+```
+
+## System & Webhooks
+
+### Verify Webhook Request
+```python
+# This verifies the signature sent by Tapsilat webhook
+is_valid = client.verify_webhook(
+    payload='{"event": "order.completed", "data": {...}}',
+    signature="some-hash-signature"
+)
+```
+
+### Get System Order Status
+```python
+status = client.get_system_order_status()
 ```
 
 ## Subscription Management

@@ -31,47 +31,19 @@ def validate_installments(installments_str: str) -> List[int]:
 
 def validate_gsm_number(phone: str) -> str:
     """
-    Validate GSM number format. Returns the original phone if valid.
+    Validate GSM number format internationally.
+    Returns the cleaned phone sequence if valid.
     """
     if not phone:
         return phone
 
     clean_phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
 
-    if not clean_phone.replace('+', '').replace('0', '').isdigit():
+    if not clean_phone.replace('+', '').isdigit():
         raise APIException(
             status_code=400,
             code=0,
             error=f"Invalid phone number format: {phone}"
         )
-
-    if clean_phone.startswith('+'):
-        if len(clean_phone) < 8:
-            raise APIException(
-                status_code=400,
-                code=0,
-                error=f"International phone number too short: {phone}"
-            )
-    elif clean_phone.startswith('00'):
-        if len(clean_phone) < 9:
-            raise APIException(
-                status_code=400,
-                code=0,
-                error=f"International phone number (00 format) too short: {phone}"
-            )
-    elif clean_phone.startswith('0'):
-        if len(clean_phone) < 7:
-            raise APIException(
-                status_code=400,
-                code=0,
-                error=f"National phone number too short: {phone}"
-            )
-    else:
-        if len(clean_phone) < 6:
-            raise APIException(
-                status_code=400,
-                code=0,
-                error=f"Local phone number too short: {phone}"
-            )
 
     return clean_phone

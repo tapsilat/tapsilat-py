@@ -31,14 +31,15 @@ def validate_installments(installments_str: str) -> List[int]:
 
 def validate_gsm_number(phone: str) -> str:
     """
-    Validate GSM number format. Returns the original phone if valid.
+    Validate GSM number format internationally.
+    Returns the cleaned phone sequence if valid.
     """
     if not phone:
         return phone
 
     clean_phone = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
 
-    if not clean_phone.replace('+', '').replace('0', '').isdigit():
+    if not clean_phone.replace('+', '').isdigit():
         raise APIException(
             status_code=400,
             code=0,

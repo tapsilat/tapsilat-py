@@ -99,6 +99,8 @@ class TestValidateGsmNumber:
         assert exc_info.value.code == 0
         assert "too short" in exc_info.value.error
 
+
+
     def test_invalid_characters(self):
         with pytest.raises(APIException) as exc_info:
             validate_gsm_number("+90abc1234567")

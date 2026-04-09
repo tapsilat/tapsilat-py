@@ -117,7 +117,6 @@ def test_order_pf_sub_merchant_dto_asdict():
     pf_sub_dict = asdict(pf_sub)
     assert pf_sub_dict["name"] == "John Doe"
     assert pf_sub_dict["mcc"] == "1234"
-    assert "id" not in pf_sub_dict
 
 
 def test_shipping_address_dto_asdict():

@@ -38,6 +38,32 @@ class BuyerDTO:
     registration_date: Optional[str] = None
     title: Optional[str] = None
     zip_code: Optional[str] = None
+    registration_address: Optional[str] = None
+
+
+@dataclass
+class BasketItemPayerDTO:
+    address: Optional[str] = None
+    reference_id: Optional[str] = None
+    tax_office: Optional[str] = None
+    title: Optional[str] = None
+    type: Optional[str] = None
+    vat: Optional[str] = None
+
+
+@dataclass
+class OrderItemPayment:
+    amount: Optional[float] = None
+    card_brand: Optional[str] = None
+    id: Optional[str] = None
+    masked_bin: Optional[str] = None
+    paid_date: Optional[str] = None
+    refundable_amount: Optional[float] = None
+    refunded: Optional[bool] = None
+    refunded_amount: Optional[float] = None
+    refunded_date: Optional[str] = None
+    status: Optional[int] = None
+    type: Optional[str] = None
 
 
 @dataclass
@@ -50,8 +76,21 @@ class BasketItemDTO:
     id: Optional[str] = None
     item_type: Optional[str] = None
     name: Optional[str] = None
+    item_payments: Optional[List[OrderItemPayment]] = None
     paid_amount: Optional[float] = None
+    paidable_amount: Optional[float] = None
     price: Optional[float] = None
+    commission_amount: Optional[float] = None
+    mcc: Optional[str] = None
+    payer: Optional[BasketItemPayerDTO] = None
+    quantity: Optional[int] = None
+    quantity_float: Optional[float] = None
+    quantity_unit: Optional[str] = None
+    refundable_amount: Optional[float] = None
+    refunded_amount: Optional[float] = None
+    status: Optional[int] = None
+    sub_merchant_key: Optional[str] = None
+    sub_merchant_price: Optional[str] = None
 
 
 @dataclass
@@ -68,6 +107,10 @@ class BillingAddressDTO:
     title: Optional[str] = None
     vat_number: Optional[str] = None
     zip_code: Optional[str] = None
+    neighbourhood: Optional[str] = None
+    street1: Optional[str] = None
+    street2: Optional[str] = None
+    street3: Optional[str] = None
 
 
 @dataclass
@@ -80,6 +123,8 @@ class CheckoutDesignDTO:
     order_detail_html: Optional[str] = None
     right_background_color: Optional[str] = None
     text_color: Optional[str] = None
+    pay_button_color: Optional[str] = None
+    redirect_url: Optional[str] = None
 
 
 @dataclass
@@ -111,6 +156,17 @@ class OrderPFSubMerchantDTO:
     mcc: Optional[str] = None
     name: Optional[str] = None
     org_id: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    country_iso_code: Optional[str] = None
+    id: Optional[str] = None
+    national_id: Optional[str] = None
+    postal_code: Optional[str] = None
+    submerchant_nin: Optional[str] = None
+    submerchant_url: Optional[str] = None
+    switch_id: Optional[str] = None
+    terminal_no: Optional[str] = None
 
 
 @dataclass
@@ -174,13 +230,13 @@ class OrderCreateDTO:
     enabled_installments: Optional[List[int]] = None
     external_reference_id: Optional[str] = None
     metadata: Optional[List[MetadataDTO]] = None
-    order_cards: Optional[OrderCardDTO] = None
+    order_cards: Optional[List[OrderCardDTO]] = None
     paid_amount: Optional[float] = None
     partial_payment: Optional[bool] = None
     payment_failure_url: Optional[str] = None
     payment_methods: Optional[bool] = None
-    payment_mode: Optional[str] = None
-    payment_options: Optional[List[str]] = None
+    payment_mode: Optional[str] = None  # "auth" or "preauth"
+    payment_options: Optional[List[str]] = None  # "credit_card","bank_transfer","cash"
     payment_success_url: Optional[str] = None
     payment_terms: Optional[List[PaymentTermDTO]] = None
     pf_sub_merchant: Optional[OrderPFSubMerchantDTO] = None
@@ -435,6 +491,7 @@ class OrderResponse(dict):
     def order_id(self) -> str:
         return self.get("order_id")
 
+
 @dataclass
 class OrderPaymentTermDeleteDTO:
     order_id: str
@@ -461,6 +518,10 @@ class OrderPaymentTermUpdateDTO:
 class OrgCreateBusinessRequest_BusinessType:
     INDIVIDUAL = 0
     CORPORATE = 1
+    NON_PROFIT = 2
+    GOVERNMENT = 3
+    UNKNOWN = 4
+
 
 @dataclass
 class OrgCreateBusinessRequest:
@@ -534,4 +595,3 @@ class OrgUserMobileVerifyReq:
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
-

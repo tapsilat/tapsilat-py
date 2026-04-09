@@ -15,5 +15,5 @@ on:
 
 jobs:
   parity-dispatch:
-    uses: tapsilat/tapsilat-sdk-parity/.github/workflows/reusable-sdk-parity-dispatch.yml@main
+    uses: tapsilat/tapsilat-sdk-parity/.github/workflows/reusable-sdk-parity-dispatch.yml@v1
     secrets: inherit

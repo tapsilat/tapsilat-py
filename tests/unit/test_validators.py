@@ -75,6 +75,30 @@ class TestValidateGsmNumber:
         result = validate_gsm_number("+90 555 123-45(67)")
         assert result == "+905551234567"
 
+    def test_international_plus_too_short(self):
+        with pytest.raises(APIException) as exc_info:
+            validate_gsm_number("+90123")
+        assert exc_info.value.code == 0
+        assert "too short" in exc_info.value.error
+
+    def test_international_00_too_short(self):
+        with pytest.raises(APIException) as exc_info:
+            validate_gsm_number("0090123")
+        assert exc_info.value.code == 0
+        assert "too short" in exc_info.value.error
+
+    def test_national_too_short(self):
+        with pytest.raises(APIException) as exc_info:
+            validate_gsm_number("012345")
+        assert exc_info.value.code == 0
+        assert "too short" in exc_info.value.error
+
+    def test_local_too_short(self):
+        with pytest.raises(APIException) as exc_info:
+            validate_gsm_number("12345")
+        assert exc_info.value.code == 0
+        assert "too short" in exc_info.value.error
+
 
 
     def test_invalid_characters(self):

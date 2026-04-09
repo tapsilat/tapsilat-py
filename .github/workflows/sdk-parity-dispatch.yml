@@ -1,0 +1,19 @@
+name: SDK Parity Dispatch
+
+on:
+  push:
+    paths:
+      - "tapsilat_py/**"
+      - "pyproject.toml"
+      - "setup.py"
+  pull_request:
+    paths:
+      - "tapsilat_py/**"
+      - "pyproject.toml"
+      - "setup.py"
+  workflow_dispatch:
+
+jobs:
+  parity-dispatch:
+    uses: tapsilat/tapsilat-sdk-parity/.github/workflows/reusable-sdk-parity-dispatch.yml@main
+    secrets: inherit

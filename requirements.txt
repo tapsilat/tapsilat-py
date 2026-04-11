@@ -20,7 +20,7 @@ packaging==25.0
 pluggy==1.6.0
 Pygments==2.20.0
 pyproject_hooks==1.2.0
-pytest==8.3.5
+pytest==8.4.2
 pytest-mock==3.14.1
 python-dotenv==1.2.1
 readme_renderer==44.0

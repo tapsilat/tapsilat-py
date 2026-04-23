@@ -1,5 +1,5 @@
 backports.tarfile==1.2.0
-build==1.4.3
+build==1.4.4
 certifi==2026.4.22
 charset-normalizer==3.4.7
 docutils==0.22.4

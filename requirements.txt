@@ -15,7 +15,7 @@ keyring==25.7.0
 markdown-it-py==3.0.0
 mdurl==0.1.2
 more-itertools==10.8.0
-nh3==0.3.4
+nh3==0.3.5
 packaging==26.1
 pluggy==1.6.0
 Pygments==2.20.0

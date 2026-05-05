@@ -4,6 +4,8 @@ from .client import TapsilatAPI
 from .exceptions import APIException
 from .models import (
     OrderCreateDTO,
+    OrderPaymentOptionsUpdateDTO,
+    SplitOrderItemPaymentDTO,
     SubscriptionBilling,
     SubscriptionCancelRequest,
     SubscriptionCreateRequest,
@@ -16,6 +18,8 @@ __all__ = [
     "TapsilatAPI",
     "APIException",
     "OrderCreateDTO",
+    "OrderPaymentOptionsUpdateDTO",
+    "SplitOrderItemPaymentDTO",
     "SubscriptionBilling",
     "SubscriptionCancelRequest",
     "SubscriptionCreateRequest",

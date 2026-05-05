@@ -21,6 +21,8 @@ from tapsilat_py.models import (
     OrderPostAuthRequest,
     OrderPaymentDetailDTO,
     CancelOrderDTO,
+    OrderPaymentOptionsUpdateDTO,
+    SplitOrderItemPaymentDTO,
 )
 from tapsilat_py.validators import validate_gsm_number, validate_installments
 
@@ -242,12 +244,9 @@ def test_scenario_10_subscription_lifecycle(api_client):
     assert isinstance(cancel_response, dict)
 
 
-def test_scenario_11_order_operations_smoke(api_client):
+def test_scenario_11_order_management_operations(api_client):
     """
-    A smoke test to ensure that the un-tested getter and setter endpoints in client.py
-    are structurally sound and do not raise unexpected local exceptions before HTTP.
-    Note: Real success depends on actual reference IDs which we don't always have,
-    so we might catch APIExceptions but their structure should be valid.
+    General test for order-related getter and setter endpoints.
     """
     # get_system_order_statuses
     try:
@@ -299,12 +298,6 @@ def test_scenario_11_order_operations_smoke(api_client):
     except APIException:
         pass
 
-    # cancel_order
-    try:
-        api_client.cancel_order(CancelOrderDTO(reference_id=dummy_ref))
-    except APIException:
-        pass
-
     # get_order_payment_details
     try:
         api_client.get_order_payment_details(
@@ -316,5 +309,64 @@ def test_scenario_11_order_operations_smoke(api_client):
     # get_order_payment_details_by_id
     try:
         api_client.get_order_payment_details_by_id(dummy_ref)
+    except APIException:
+        pass
+
+    # cancel_order
+    try:
+        api_client.cancel_order(CancelOrderDTO(reference_id=dummy_ref))
+    except APIException:
+        pass
+
+
+def test_scenario_12_update_payment_options(api_client):
+    buyer = BuyerDTO(name="John", surname="Doe", email="test@example.com")
+    order = api_client.create_order(
+        OrderCreateDTO(amount=100.0, currency="TRY", locale="tr", buyer=buyer)
+    )
+    ref_id = order.reference_id
+
+    try:
+        api_client.update_payment_options(
+            OrderPaymentOptionsUpdateDTO(
+                reference_id=ref_id, payment_options=["credit_card"]
+            )
+        )
+    except APIException:
+        pass
+
+
+def test_scenario_13_split_order_item_payment(api_client):
+    buyer = BuyerDTO(name="John", surname="Doe", email="test@example.com")
+    order = api_client.create_order(
+        OrderCreateDTO(amount=100.0, currency="TRY", locale="tr", buyer=buyer)
+    )
+    ref_id = order.reference_id
+
+    try:
+        # Note: In a real scenario, you'd need a valid order_item_payment_id
+        api_client.split_order_item_payment(
+            SplitOrderItemPaymentDTO(
+                order_id=ref_id, order_item_payment_id=ref_id, amount=1.0
+            )
+        )
+    except APIException:
+        pass
+
+
+def test_scenario_14_order_callback_and_vpos_query(api_client):
+    buyer = BuyerDTO(name="John", surname="Doe", email="test@example.com")
+    order = api_client.create_order(
+        OrderCreateDTO(amount=100.0, currency="TRY", locale="tr", buyer=buyer)
+    )
+    ref_id = order.reference_id
+
+    try:
+        api_client.order_callback(ref_id)
+    except APIException:
+        pass
+
+    try:
+        api_client.order_vpos_query(ref_id)
     except APIException:
         pass

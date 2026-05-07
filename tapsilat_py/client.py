@@ -36,8 +36,6 @@ from .models import (
     RemoveBasketItemRequest,
     UpdateBasketItemRequest,
     CallbackURLDTO,
-    OrderPaymentOptionsUpdateDTO,
-    SplitOrderItemPaymentDTO,
 )
 from .validators import validate_gsm_number, validate_installments
 
@@ -252,24 +250,6 @@ class TapsilatAPI:
         endpoint = "/order/releated"
         payload = request.to_dict()
         return self._make_request("PATCH", endpoint, json_payload=payload)
-
-    def update_payment_options(self, request: OrderPaymentOptionsUpdateDTO) -> dict:
-        endpoint = "/order/payment-options"
-        payload = request.to_dict()
-        return self._make_request("PATCH", endpoint, json_payload=payload)
-
-    def split_order_item_payment(self, request: SplitOrderItemPaymentDTO) -> dict:
-        endpoint = "/order/split"
-        payload = request.to_dict()
-        return self._make_request("POST", endpoint, json_payload=payload)
-
-    def order_callback(self, id: str) -> dict:
-        endpoint = f"/orders/{id}/callback"
-        return self._make_request("GET", endpoint)
-
-    def order_vpos_query(self, id: str) -> dict:
-        endpoint = f"/orders/{id}/vpos-query"
-        return self._make_request("GET", endpoint)
 
     def add_basket_item(self, request: AddBasketItemRequest) -> dict:
         endpoint = "/order/basket-item"

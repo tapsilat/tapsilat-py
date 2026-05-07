@@ -595,22 +595,3 @@ class OrgUserMobileVerifyReq:
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
-
-
-@dataclass
-class OrderPaymentOptionsUpdateDTO:
-    payment_options: List[str]
-    reference_id: str
-
-    def to_dict(self) -> dict:
-        return _asdict_factory(self)
-
-
-@dataclass
-class SplitOrderItemPaymentDTO:
-    amount: float
-    order_id: str
-    order_item_payment_id: str
-
-    def to_dict(self) -> dict:
-        return _asdict_factory(self)

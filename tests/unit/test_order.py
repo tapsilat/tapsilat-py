@@ -26,8 +26,6 @@ from tapsilat_py.models import (
     TerminateRequest,
     OrderManualCallbackDTO,
     OrderRelatedReferenceDTO,
-    OrderPaymentOptionsUpdateDTO,
-    SplitOrderItemPaymentDTO,
 )
 
 
@@ -883,53 +881,3 @@ def test_create_order_with_invalid_gsm_raises_exception(mock_api_request):
 
     assert exc_info.value.code == 0
     mock_api_request.assert_not_called()
-
-
-def test_update_payment_options(mock_api_request):
-    mock_api_request.return_value = {"status": "success"}
-
-    req = OrderPaymentOptionsUpdateDTO(
-        reference_id="ref123", payment_options=["credit_card", "cash"]
-    )
-    client = TapsilatAPI()
-    response = client.update_payment_options(req)
-
-    mock_api_request.assert_called_once_with(
-        "PATCH", "/order/payment-options", json_payload=req.to_dict()
-    )
-    assert response["status"] == "success"
-
-
-def test_split_order_item_payment(mock_api_request):
-    mock_api_request.return_value = {"status": "success"}
-
-    req = SplitOrderItemPaymentDTO(
-        order_id="order123", order_item_payment_id="pay123", amount=50.0
-    )
-    client = TapsilatAPI()
-    response = client.split_order_item_payment(req)
-
-    mock_api_request.assert_called_once_with(
-        "POST", "/order/split", json_payload=req.to_dict()
-    )
-    assert response["status"] == "success"
-
-
-def test_order_callback(mock_api_request):
-    mock_api_request.return_value = {"status": "success"}
-
-    client = TapsilatAPI()
-    response = client.order_callback("order123")
-
-    mock_api_request.assert_called_once_with("GET", "/orders/order123/callback")
-    assert response["status"] == "success"
-
-
-def test_order_vpos_query(mock_api_request):
-    mock_api_request.return_value = {"status": "success"}
-
-    client = TapsilatAPI()
-    response = client.order_vpos_query("order123")
-
-    mock_api_request.assert_called_once_with("GET", "/orders/order123/vpos-query")
-    assert response["status"] == "success"

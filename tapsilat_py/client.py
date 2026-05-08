@@ -141,6 +141,38 @@ class TapsilatAPI:
         endpoint = "/system/order-statuses"
         return self._make_request("GET", endpoint)
 
+    def get_system_basket_item_types(self) -> dict:
+        endpoint = "/system/basket-item-types"
+        return self._make_request("GET", endpoint)
+
+    def get_system_error_codes(self) -> dict:
+        endpoint = "/system/error-codes"
+        return self._make_request("GET", endpoint)
+
+    def get_system_payment_term_statuses(self) -> dict:
+        endpoint = "/system/payment-term-statuses"
+        return self._make_request("GET", endpoint)
+
+    def get_system_product_types(self) -> dict:
+        endpoint = "/system/product-types"
+        return self._make_request("GET", endpoint)
+
+    def get_system_shortcut_types(self) -> dict:
+        endpoint = "/system/shortcut-types"
+        return self._make_request("GET", endpoint)
+
+    def get_system_transaction_payment_types(self) -> dict:
+        endpoint = "/system/transaction-payment-types"
+        return self._make_request("GET", endpoint)
+
+    def get_system_transaction_purposes(self) -> dict:
+        endpoint = "/system/transaction-purposes"
+        return self._make_request("GET", endpoint)
+
+    def get_system_transaction_statuses(self) -> dict:
+        endpoint = "/system/transaction-statuses"
+        return self._make_request("GET", endpoint)
+
     def get_order(self, reference_id: str) -> OrderResponse:
         endpoint = f"/order/{reference_id}"
         response = self._make_request("GET", endpoint)

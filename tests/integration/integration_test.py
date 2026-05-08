@@ -262,7 +262,11 @@ def test_scenario_11_order_management_operations(api_client):
     except APIException:
         pass
 
-    dummy_ref = "dummy_ref_123"
+    buyer = BuyerDTO(name="John", surname="Doe", email="test@example.com")
+    order = api_client.create_order(
+        OrderCreateDTO(amount=100.0, currency="TRY", locale="tr", buyer=buyer)
+    )
+    dummy_ref = order.reference_id
 
     # get_order_by_conversation_id
     try:

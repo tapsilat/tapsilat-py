@@ -304,9 +304,17 @@ is_valid = client.verify_webhook(
 )
 ```
 
-### Get System Order Status
+### Get System Definitions and Statuses
 ```python
-status = client.get_system_order_status()
+order_statuses = client.get_system_order_statuses()
+basket_item_types = client.get_system_basket_item_types()
+error_codes = client.get_system_error_codes()
+payment_term_statuses = client.get_system_payment_term_statuses()
+product_types = client.get_system_product_types()
+shortcut_types = client.get_system_shortcut_types()
+transaction_payment_types = client.get_system_transaction_payment_types()
+transaction_purposes = client.get_system_transaction_purposes()
+transaction_statuses = client.get_system_transaction_statuses()
 ```
 
 ## Subscription Management

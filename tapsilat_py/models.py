@@ -52,6 +52,21 @@ class BasketItemPayerDTO:
 
 
 @dataclass
+class OrderItemPayment:
+    amount: Optional[float] = None
+    card_brand: Optional[str] = None
+    id: Optional[str] = None
+    masked_bin: Optional[str] = None
+    paid_date: Optional[str] = None
+    refundable_amount: Optional[float] = None
+    refunded: Optional[bool] = None
+    refunded_amount: Optional[float] = None
+    refunded_date: Optional[str] = None
+    status: Optional[int] = None
+    type: Optional[str] = None
+
+
+@dataclass
 class BasketItemDTO:
     category1: Optional[str] = None
     category2: Optional[str] = None
@@ -61,7 +76,9 @@ class BasketItemDTO:
     id: Optional[str] = None
     item_type: Optional[str] = None
     name: Optional[str] = None
+    item_payments: Optional[List[OrderItemPayment]] = None
     paid_amount: Optional[float] = None
+    paidable_amount: Optional[float] = None
     price: Optional[float] = None
     commission_amount: Optional[float] = None
     mcc: Optional[str] = None
@@ -69,6 +86,9 @@ class BasketItemDTO:
     quantity: Optional[int] = None
     quantity_float: Optional[float] = None
     quantity_unit: Optional[str] = None
+    refundable_amount: Optional[float] = None
+    refunded_amount: Optional[float] = None
+    status: Optional[int] = None
     sub_merchant_key: Optional[str] = None
     sub_merchant_price: Optional[str] = None
 
@@ -498,6 +518,9 @@ class OrderPaymentTermUpdateDTO:
 class OrgCreateBusinessRequest_BusinessType:
     INDIVIDUAL = 0
     CORPORATE = 1
+    NON_PROFIT = 2
+    GOVERNMENT = 3
+    UNKNOWN = 4
 
 
 @dataclass

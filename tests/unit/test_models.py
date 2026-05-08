@@ -4,8 +4,10 @@ from tapsilat_py.models import (
     BillingAddressDTO,
     BuyerDTO,
     CheckoutDesignDTO,
+    OrderItemPayment,
     OrderCardDTO,
     OrderCreateDTO,
+    OrgCreateBusinessRequest_BusinessType,
     OrderPFSubMerchantDTO,
     PaymentTermDTO,
     OrderConsent,
@@ -36,6 +38,15 @@ def test_buyer_dto_all_fields():
 
 
 def test_basket_item_dto_all_fields():
+    item_payment = OrderItemPayment(
+        id="pay1",
+        amount=90.0,
+        refunded_amount=5.0,
+        refundable_amount=85.0,
+        status=1,
+        type="credit_card"
+    )
+
     payer = BasketItemPayerDTO(
         address="Test Address", 
         reference_id="ref1", 
@@ -56,10 +67,15 @@ def test_basket_item_dto_all_fields():
         sub_merchant_price="100.0",
         coupon="SAVE10",
         coupon_discount=10.0,
+        item_payments=[item_payment],
         quantity=1,
         quantity_float=1.0,
         quantity_unit="pcs",
         paid_amount=90.0,
+        paidable_amount=85.0,
+        refundable_amount=85.0,
+        refunded_amount=5.0,
+        status=1,
         data="extra",
         payer=payer,
         commission_amount=5.0,
@@ -69,6 +85,19 @@ def test_basket_item_dto_all_fields():
     assert basket_item.payer.title == "Company"
     assert basket_item.commission_amount == 5.0
     assert basket_item.quantity_float == 1.0
+    assert basket_item.item_payments[0].id == "pay1"
+    assert basket_item.paidable_amount == 85.0
+    assert basket_item.refundable_amount == 85.0
+    assert basket_item.refunded_amount == 5.0
+    assert basket_item.status == 1
+
+
+def test_org_create_business_type_enum_values():
+    assert OrgCreateBusinessRequest_BusinessType.INDIVIDUAL == 0
+    assert OrgCreateBusinessRequest_BusinessType.CORPORATE == 1
+    assert OrgCreateBusinessRequest_BusinessType.NON_PROFIT == 2
+    assert OrgCreateBusinessRequest_BusinessType.GOVERNMENT == 3
+    assert OrgCreateBusinessRequest_BusinessType.UNKNOWN == 4
 
 
 def test_checkout_design_dto_all_fields():

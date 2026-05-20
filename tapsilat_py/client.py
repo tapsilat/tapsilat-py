@@ -396,6 +396,21 @@ class TapsilatAPI:
         params = {"page": page, "per_page": per_page}
         return self._make_request("GET", endpoint, params=params)
 
+    def get_organization_suborganization_details(self, id: str) -> dict:
+        """Get Sub-Organization Details"""
+        endpoint = f"/organization/suborganizations/{id}"
+        return self._make_request("GET", endpoint)
+
+    def get_organization_suborganization_submerchants(self, id: str) -> dict:
+        """Get Sub-Organization Submerchants"""
+        endpoint = f"/organization/suborganizations/{id}/submerchant"
+        return self._make_request("GET", endpoint)
+
+    def get_organization_currency_presets(self) -> dict:
+        """Get Organization Currency Presets"""
+        endpoint = "/organization/currency-presets"
+        return self._make_request("GET", endpoint)
+
     def create_organization_user(self, request: OrgCreateUserReq) -> dict:
         """Create Organization User"""
         endpoint = "/organization/user/create"

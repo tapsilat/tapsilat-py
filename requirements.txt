@@ -23,7 +23,7 @@ pyproject_hooks==1.2.0
 pytest==9.1.1
 pytest-mock==3.15.1
 python-dotenv==1.2.2
-readme_renderer==44.0
+readme_renderer==45.0
 requests==2.34.2
 requests-toolbelt==1.0.0
 rfc3986==2.0.0

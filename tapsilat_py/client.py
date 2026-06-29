@@ -191,6 +191,8 @@ class TapsilatAPI:
         end_date: str = "",
         organization_id: str = "",
         related_reference_id: str = "",
+        buyer_id: str = "",
+        status: Optional[int] = None,
     ) -> dict:
         endpoint = "/order/list"
         raw_params = {
@@ -200,6 +202,8 @@ class TapsilatAPI:
             "end_date": end_date,
             "organization_id": organization_id,
             "related_reference_id": related_reference_id,
+            "buyer_id": buyer_id,
+            "status": status,
         }
         params = {k: v for k, v in raw_params.items() if v not in ("", None)}
         return self._make_request("GET", endpoint, params=params)
@@ -321,12 +325,8 @@ class TapsilatAPI:
     def get_orders(
         self, page: str = "1", per_page: str = "10", buyer_id: str = ""
     ) -> dict:
-        """Get orders with pagination and optional buyer filter"""
-        endpoint = "/order/list"
-        params = {"page": page, "per_page": per_page}
-        if buyer_id:
-            params["buyer_id"] = buyer_id
-        return self._make_request("GET", endpoint, params=params)
+        """DEPRECATED: Use get_order_list instead. Get orders with pagination and optional buyer filter"""
+        return self.get_order_list(page=int(page), per_page=int(per_page), buyer_id=buyer_id)
 
     def get_organization_settings(self) -> dict:
         """Get organization settings"""
@@ -380,7 +380,7 @@ class TapsilatAPI:
 
     def get_organization_meta(self, name: str) -> dict:
         """Get Organization Metadata"""
-        endpoint = f"/organization/meta/{name}"
+        endpoint = f"/organization/metas/{name}"
         return self._make_request("GET", endpoint)
 
     def get_organization_scopes(self) -> dict:

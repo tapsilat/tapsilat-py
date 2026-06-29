@@ -39,6 +39,9 @@ class BuyerDTO:
     title: Optional[str] = None
     zip_code: Optional[str] = None
     registration_address: Optional[str] = None
+    income_type: Optional[str] = None
+    education: Optional[str] = None
+    occupation: Optional[str] = None
 
 
 @dataclass
@@ -49,6 +52,11 @@ class BasketItemPayerDTO:
     title: Optional[str] = None
     type: Optional[str] = None
     vat: Optional[str] = None
+    name: Optional[str] = None
+    surname: Optional[str] = None
+    identity_number: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
 
 
 @dataclass

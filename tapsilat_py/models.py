@@ -39,6 +39,9 @@ class BuyerDTO:
     title: Optional[str] = None
     zip_code: Optional[str] = None
     registration_address: Optional[str] = None
+    income_type: Optional[str] = None
+    education: Optional[str] = None
+    occupation: Optional[str] = None
 
 
 @dataclass
@@ -49,6 +52,11 @@ class BasketItemPayerDTO:
     title: Optional[str] = None
     type: Optional[str] = None
     vat: Optional[str] = None
+    name: Optional[str] = None
+    surname: Optional[str] = None
+    identity_number: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
 
 
 @dataclass
@@ -614,3 +622,84 @@ class SplitOrderItemPaymentDTO:
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
+
+@dataclass
+class GetOrderPaymentsRequest:
+    order_id: Optional[str] = None
+    order_reference_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrderOIPDTO:
+    order_id: str
+    basket_item_id: str
+    amount: float
+    type: int
+    wallet_id: Optional[str] = None
+    paid_date: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrgUserTokenCreateReq:
+    email: str
+    expire: int
+    invalidate_old_tokens: bool = False
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class SubmerchantCreateDTO:
+    locale: Optional[str] = None
+    conversation_id: Optional[str] = None
+    name: Optional[str] = None
+    email: Optional[str] = None
+    gsm_number: Optional[str] = None
+    address: Optional[str] = None
+    iban: Optional[str] = None
+    tax_office: Optional[str] = None
+    legal_company_title: Optional[str] = None
+    currency_id: Optional[str] = None
+    sub_merchant_external_id: Optional[str] = None
+    identity_number: Optional[str] = None
+    sub_merchant_type: Optional[str] = None
+    tax_number: Optional[str] = None
+    sub_merchant_key: Optional[str] = None
+    organization_id: Optional[str] = None
+    status: Optional[str] = None
+    system_time: Optional[int] = None
+    contact_name: Optional[str] = None
+    contact_surname: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class SubmerchantUpdateDTO(SubmerchantCreateDTO):
+    pass
+
+
+class FileResponse:
+    def __init__(self, content: bytes, filename: str = "download"):
+        self.content = content
+        self.filename = filename
+
+    def download(self, destination: Optional[str] = None):
+        import os
+        if destination is None:
+            destination = os.path.join(os.getcwd(), self.filename)
+        elif os.path.isdir(destination):
+            destination = os.path.join(destination, self.filename)
+        
+        with open(destination, "wb") as f:
+            f.write(self.content)
+        return destination

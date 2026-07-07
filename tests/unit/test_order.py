@@ -933,3 +933,197 @@ def test_order_vpos_query(mock_api_request):
 
     mock_api_request.assert_called_once_with("GET", "/orders/order123/vpos-query")
     assert response["status"] == "success"
+
+import pytest
+from unittest.mock import patch, MagicMock
+from tapsilat_py.client import TapsilatAPI
+from tapsilat_py.models import (
+    OrderPaymentTermDeleteDTO,
+    OrderPaymentTermUpdateDTO,
+    TerminateRequest,
+    RefundAllOrderDTO,
+)
+
+@pytest.fixture
+def client():
+    return TapsilatAPI(api_key="test_key")
+
+@patch('tapsilat_py.client.requests.request')
+def test_delete_order_term(mock_request, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = b'{"success": true}'
+    mock_response.json.return_value = {"success": True}
+    mock_request.return_value = mock_response
+
+    request_dto = OrderPaymentTermDeleteDTO(order_id="123", term_reference_id="abc")
+    response = client.delete_order_term(request_dto)
+
+    assert response == {"success": True}
+    mock_request.assert_called_once()
+    assert mock_request.call_args[0][0] == "DELETE"
+    assert "/order/term" in mock_request.call_args[0][1]
+
+
+@patch('tapsilat_py.client.requests.request')
+def test_update_order_term(mock_request, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = b'{"success": true}'
+    mock_response.json.return_value = {"success": True}
+    mock_request.return_value = mock_response
+
+    request_dto = OrderPaymentTermUpdateDTO(
+        amount=100.0,
+        due_date="2023-12-31",
+        paid_date=None,
+        required=True,
+        status="pending",
+        term_reference_id="abc",
+        term_sequence=1
+    )
+    response = client.update_order_term(request_dto)
+
+    assert response == {"success": True}
+    mock_request.assert_called_once()
+    assert mock_request.call_args[0][0] == "PATCH"
+    assert "/order/term" in mock_request.call_args[0][1]
+
+@patch('tapsilat_py.client.requests.request')
+def test_get_order_term(mock_request, client):
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = b'{"term_reference_id": "abc"}'
+    mock_response.json.return_value = {"term_reference_id": "abc"}
+    mock_request.return_value = mock_response
+
+    response = client.get_order_term("abc")
+
+    assert response == {"term_reference_id": "abc"}
+    mock_request.assert_called_once()
+    assert mock_request.call_args[0][0] == "GET"
+    assert "/order/term" in mock_request.call_args[0][1]
+    assert mock_request.call_args[1]["params"] == {"term_reference_id": "abc"}
+
+
+import pytest
+from tapsilat_py.client import TapsilatAPI
+from tapsilat_py.models import (
+    OrderCreateDTO,
+    BuyerDTO,
+    OrderAccountingRequest,
+    OrderPostAuthRequest,
+    OrderResponse,
+)
+
+
+@pytest.fixture
+def mock_api_request(mocker):
+    mock = mocker.patch.object(TapsilatAPI, "_make_request")
+    return mock
+
+
+def test_create_order_new_fields(mock_api_request, mocker):
+    # Mock return for create_order (POST)
+    mock_api_request.return_value = {"reference_id": "ref123", "order_id": "order123"}
+
+    # Mock get_checkout_url to avoid second API call if implemented that way
+    # Based on client.py, create_order calls get_checkout_url internally if reference_id is present
+    mock_get_checkout_url = mocker.patch.object(TapsilatAPI, "get_checkout_url")
+    mock_get_checkout_url.return_value = "https://checkout.url"
+
+    buyer = BuyerDTO(name="John", surname="Doe")
+    order_dto = OrderCreateDTO(
+        amount=100.0,
+        currency="TRY",
+        locale="tr",
+        buyer=buyer,
+        payment_mode="card",
+        redirect_success_url="https://example.com/success",
+        redirect_failure_url="https://example.com/fail",
+    )
+
+    client = TapsilatAPI()
+    client.create_order(order_dto)
+
+    # Verify the first call (POST /order/create) contains new fields
+    mock_api_request.assert_any_call(
+        "POST", "/order/create", json_payload=order_dto.to_dict()
+    )
+
+    # Verify specific fields in the payload
+    # We inspect the call args to be sure
+    call_args = mock_api_request.call_args_list[0]
+    json_payload = call_args.kwargs["json_payload"]
+    assert json_payload["payment_mode"] == "card"
+    assert json_payload["redirect_success_url"] == "https://example.com/success"
+    assert json_payload["redirect_failure_url"] == "https://example.com/fail"
+
+
+def test_order_accounting(mock_api_request):
+    mock_api_request.return_value = {}
+
+    req = OrderAccountingRequest(order_reference_id="ref123")
+    client = TapsilatAPI()
+    client.order_accounting(req)
+
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/accounting", json_payload=req.to_dict()
+    )
+
+
+def test_order_postauth(mock_api_request):
+    mock_api_request.return_value = {}
+
+    req = OrderPostAuthRequest(amount=50.0, reference_id="ref123")
+    client = TapsilatAPI()
+    client.order_postauth(req)
+
+    mock_api_request.assert_called_once_with(
+        "POST", "/order/postauth", json_payload=req.to_dict()
+    )
+
+
+def test_get_system_order_statuses(mock_api_request):
+    mock_api_request.return_value = {}
+
+    client = TapsilatAPI()
+    client.get_system_order_statuses()
+
+    mock_api_request.assert_called_once_with("GET", "/system/order-statuses")
+
+def test_get_order_payments(mock_api_request):
+    mock_api_request.return_value = {}
+    from tapsilat_py.models import GetOrderPaymentsRequest
+    req = GetOrderPaymentsRequest(order_id="123")
+    client = TapsilatAPI()
+    client.get_order_payments(req)
+    mock_api_request.assert_called_once_with("POST", "/order/payments", json_payload=req.to_dict())
+
+def test_get_order_pdf(mock_api_request):
+    mock_api_request.return_value = {}
+    client = TapsilatAPI()
+    client.get_order_pdf("123")
+    mock_api_request.assert_called_once_with("GET", "/order/123/export/pdf", raw_response=True)
+
+def test_get_order_excel(mock_api_request):
+    mock_api_request.return_value = {}
+    client = TapsilatAPI()
+    client.get_order_excel("123")
+    mock_api_request.assert_called_once_with("GET", "/order/123/export/excel", raw_response=True)
+
+def test_create_order_refund_request(mock_api_request):
+    mock_api_request.return_value = {}
+    from tapsilat_py.models import RefundOrderDTO
+    req = RefundOrderDTO(amount=10.0, reference_id="ref")
+    client = TapsilatAPI()
+    client.create_order_refund_request(req)
+    mock_api_request.assert_called_once_with("POST", "/order/refund-request", json_payload=req.to_dict())
+
+def test_add_order_oip(mock_api_request):
+    mock_api_request.return_value = {}
+    from tapsilat_py.models import OrderOIPDTO
+    req = OrderOIPDTO(order_id="1", basket_item_id="2", amount=1.0, type=1)
+    client = TapsilatAPI()
+    client.add_order_oip(req)
+    mock_api_request.assert_called_once_with("POST", "/order/oip", json_payload=req.to_dict())

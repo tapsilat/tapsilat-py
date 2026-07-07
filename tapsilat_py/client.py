@@ -38,6 +38,12 @@ from .models import (
     CallbackURLDTO,
     OrderPaymentOptionsUpdateDTO,
     SplitOrderItemPaymentDTO,
+    GetOrderPaymentsRequest,
+    OrderOIPDTO,
+    OrgUserTokenCreateReq,
+    SubmerchantCreateDTO,
+    SubmerchantUpdateDTO,
+    FileResponse,
 )
 from .validators import validate_gsm_number, validate_installments
 
@@ -65,6 +71,7 @@ class TapsilatAPI:
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
         json_payload: Optional[Dict[str, Any]] = None,
+        raw_response: bool = False,
     ) -> Any:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         headers = self._get_headers()
@@ -79,6 +86,14 @@ class TapsilatAPI:
                 timeout=self.timeout,
             )
             response.raise_for_status()
+
+            if raw_response:
+                filename = "download"
+                cd = response.headers.get("Content-Disposition")
+                if cd and "filename=" in cd:
+                    filename = cd.split("filename=")[-1].strip('"')
+                return FileResponse(response.content, filename)
+
             if response.content:
                 return response.json()
             return {}
@@ -328,6 +343,29 @@ class TapsilatAPI:
         """DEPRECATED: Use get_order_list instead. Get orders with pagination and optional buyer filter"""
         return self.get_order_list(page=int(page), per_page=int(per_page), buyer_id=buyer_id)
 
+    def get_order_payments(self, request: GetOrderPaymentsRequest) -> dict:
+        endpoint = "/order/payments"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def get_order_pdf(self, id: str) -> FileResponse:
+        endpoint = f"/order/{id}/export/pdf"
+        return self._make_request("GET", endpoint, raw_response=True)
+
+    def get_order_excel(self, id: str) -> FileResponse:
+        endpoint = f"/order/{id}/export/excel"
+        return self._make_request("GET", endpoint, raw_response=True)
+
+    def create_order_refund_request(self, request: RefundOrderDTO) -> dict:
+        endpoint = "/order/refund-request"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def add_order_oip(self, request: OrderOIPDTO) -> dict:
+        endpoint = "/order/oip"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
     def get_organization_settings(self) -> dict:
         """Get organization settings"""
         endpoint = "/organization/settings"
@@ -428,6 +466,46 @@ class TapsilatAPI:
         endpoint = "/organization/user/verify-mobile"
         payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
+
+    def create_organization_user_token(self, request: OrgUserTokenCreateReq) -> dict:
+        """Create Organization User Token"""
+        endpoint = "/organization/user/token"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    # Submerchant methods
+    def create_submerchant(self, request: SubmerchantCreateDTO) -> dict:
+        """Create Submerchant"""
+        endpoint = "/submerchants"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def get_submerchant(self, id: str) -> dict:
+        """Get Submerchant by ID"""
+        endpoint = f"/submerchants/{id}"
+        return self._make_request("GET", endpoint)
+
+    def get_suborganization_by_submerchant(self, id: str) -> dict:
+        """Get Suborganization by Submerchant ID"""
+        endpoint = f"/submerchants/{id}/suborganization"
+        return self._make_request("GET", endpoint)
+
+    def update_submerchant(self, id: str, request: SubmerchantUpdateDTO) -> dict:
+        """Update Submerchant"""
+        endpoint = f"/submerchants/{id}"
+        payload = request.to_dict()
+        return self._make_request("PATCH", endpoint, json_payload=payload)
+
+    def delete_submerchant(self, id: str) -> dict:
+        """Delete Submerchant"""
+        endpoint = f"/submerchants/{id}"
+        return self._make_request("DELETE", endpoint)
+
+    def list_submerchants(self, page: int = 1, per_page: int = 10) -> dict:
+        """List Submerchants"""
+        endpoint = "/submerchants"
+        params = {"page": page, "per_page": per_page}
+        return self._make_request("GET", endpoint, params=params)
 
     # Subscription methods
     def get_subscription(self, request: SubscriptionGetRequest) -> dict:

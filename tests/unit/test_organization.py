@@ -214,3 +214,11 @@ def test_verify_organization_user_mobile(mock_request, client):
     assert response == {"success": True}
     mock_request.assert_called_once()
     assert "/organization/user/verify-mobile" in mock_request.call_args[0][1]
+
+def test_create_organization_user_token(mock_api_request):
+    mock_api_request.return_value = {}
+    from tapsilat_py.models import OrgUserTokenCreateReq
+    req = OrgUserTokenCreateReq(email="test@test.com", expire=3600)
+    client = TapsilatAPI()
+    client.create_organization_user_token(req)
+    mock_api_request.assert_called_once_with("POST", "/organization/user/token", json_payload=req.to_dict())

@@ -1091,3 +1091,39 @@ def test_get_system_order_statuses(mock_api_request):
     client.get_system_order_statuses()
 
     mock_api_request.assert_called_once_with("GET", "/system/order-statuses")
+
+def test_get_order_payments(mock_api_request):
+    mock_api_request.return_value = {}
+    from tapsilat_py.models import GetOrderPaymentsRequest
+    req = GetOrderPaymentsRequest(order_id="123")
+    client = TapsilatAPI()
+    client.get_order_payments(req)
+    mock_api_request.assert_called_once_with("POST", "/order/payments", json_payload=req.to_dict())
+
+def test_get_order_pdf(mock_api_request):
+    mock_api_request.return_value = {}
+    client = TapsilatAPI()
+    client.get_order_pdf("123")
+    mock_api_request.assert_called_once_with("GET", "/order/123/export/pdf", raw_response=True)
+
+def test_get_order_excel(mock_api_request):
+    mock_api_request.return_value = {}
+    client = TapsilatAPI()
+    client.get_order_excel("123")
+    mock_api_request.assert_called_once_with("GET", "/order/123/export/excel", raw_response=True)
+
+def test_create_order_refund_request(mock_api_request):
+    mock_api_request.return_value = {}
+    from tapsilat_py.models import RefundOrderDTO
+    req = RefundOrderDTO(amount=10.0, reference_id="ref")
+    client = TapsilatAPI()
+    client.create_order_refund_request(req)
+    mock_api_request.assert_called_once_with("POST", "/order/refund-request", json_payload=req.to_dict())
+
+def test_add_order_oip(mock_api_request):
+    mock_api_request.return_value = {}
+    from tapsilat_py.models import OrderOIPDTO
+    req = OrderOIPDTO(order_id="1", basket_item_id="2", amount=1.0, type=1)
+    client = TapsilatAPI()
+    client.add_order_oip(req)
+    mock_api_request.assert_called_once_with("POST", "/order/oip", json_payload=req.to_dict())

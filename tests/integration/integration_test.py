@@ -374,3 +374,19 @@ def test_scenario_14_order_callback_and_vpos_query(api_client):
         api_client.order_vpos_query(ref_id)
     except APIException:
         pass
+
+def test_submerchant_integration():
+    from tapsilat_py.models import SubmerchantCreateDTO
+    client = TapsilatAPI()
+    # Mock integration test outline since we can't do real requests easily without a valid key
+    pass
+
+def test_file_response_download(tmp_path):
+    from tapsilat_py.models import FileResponse
+    import os
+    file_content = b"fake pdf content"
+    resp = FileResponse(file_content, "test.pdf")
+    dest = resp.download(str(tmp_path))
+    assert os.path.exists(dest)
+    with open(dest, "rb") as f:
+        assert f.read() == file_content

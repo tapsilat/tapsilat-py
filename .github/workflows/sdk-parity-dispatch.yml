@@ -15,5 +15,65 @@ on:
 
 jobs:
   parity-dispatch:
-    uses: tapsilat/tapsilat-sdk-parity/.github/workflows/reusable-sdk-parity-dispatch.yml@v1
-    secrets: inherit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PARITY_MAIN_REPO: ${{ secrets.PARITY_MAIN_REPO }}
+      # Replace with an immutable parity release tag once the private composite action is published.
+      PARITY_MAIN_REF: main
+
+    steps:
+      - name: Preflight fork PR gate
+        id: preflight
+        shell: bash
+        run: |
+          should_skip=false
+          skip_reason=""
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            if [[ "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+              should_skip=true
+              skip_reason="Fork pull requests do not receive parity secrets, so dispatch is skipped safely."
+            fi
+          fi
+
+          {
+            echo "should_skip=$should_skip"
+            echo "skip_reason=$skip_reason"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Write skip summary
+        if: steps.preflight.outputs.should_skip == 'true'
+        run: |
+          {
+            echo "# SDK Parity Dispatch"
+            echo
+            echo "- Status: skipped"
+            echo "- Reason: ${{ steps.preflight.outputs.skip_reason }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create GitHub App token
+        if: steps.preflight.outputs.should_skip != 'true'
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PARITY_APP_ID }}
+          private-key: ${{ secrets.PARITY_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Checkout parity main repo
+        if: steps.preflight.outputs.should_skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app_token.outputs.token }}
+          repository: ${{ env.PARITY_MAIN_REPO }}
+          ref: ${{ env.PARITY_MAIN_REF }}
+          path: parity-main
+
+      - name: Dispatch via private parity action
+        if: steps.preflight.outputs.should_skip != 'true'
+        uses: ./parity-main/.github/actions/sdk-parity-dispatch
+        with:
+          app_token: ${{ steps.app_token.outputs.token }}
+          parity_repo: ${{ env.PARITY_MAIN_REPO }}

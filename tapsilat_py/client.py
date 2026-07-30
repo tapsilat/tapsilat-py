@@ -7,6 +7,8 @@ import requests
 from .exceptions import APIException
 from .models import (
     OrderAccountingRequest,
+    OrderChargeRequest,
+    CreateOrganizationCurrencyPayload,
     OrderCreateDTO,
     OrderPaymentTermCreateDTO,
     OrderPostAuthRequest,
@@ -537,6 +539,37 @@ class TapsilatAPI:
         endpoint = "/subscription/redirect"
         payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
+
+
+    def charge_order(self, request: OrderChargeRequest) -> Dict[str, Any]:
+        endpoint = "/order/charge"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def create_org_currency(self, payload: CreateOrganizationCurrencyPayload) -> Dict[str, Any]:
+        endpoint = "/organization/currencies"
+        return self._make_request("POST", endpoint, json_payload=payload.to_dict())
+
+    def get_org_metadata(self, name: str) -> Dict[str, Any]:
+        endpoint = f"/organization/meta/{name}"
+        return self._make_request("GET", endpoint)
+
+    def get_org_partners(self) -> Dict[str, Any]:
+        endpoint = "/organization/partners"
+        return self._make_request("GET", endpoint)
+
+    def get_org_limits(self, org_id: str, currency: str = None, operation: str = None) -> Dict[str, Any]:
+        endpoint = f"/organization/{org_id}/limits"
+        params = {}
+        if currency:
+            params['currency'] = currency
+        if operation:
+            params['operation'] = operation
+        return self._make_request("GET", endpoint, params=params)
+
+    def get_system_config(self) -> Dict[str, Any]:
+        endpoint = "/system/config"
+        return self._make_request("GET", endpoint)
 
     @staticmethod
     def verify_webhook(payload: str, signature: str, secret: str) -> bool:

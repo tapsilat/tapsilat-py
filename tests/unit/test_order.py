@@ -5,6 +5,7 @@ import pytest
 from tapsilat_py.client import TapsilatAPI
 from tapsilat_py.exceptions import APIException
 from tapsilat_py.models import (
+    OrderChargeRequest,
     BasketItemDTO,
     BillingAddressDTO,
     BuyerDTO,
@@ -938,6 +939,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from tapsilat_py.client import TapsilatAPI
 from tapsilat_py.models import (
+    OrderChargeRequest,
     OrderPaymentTermDeleteDTO,
     OrderPaymentTermUpdateDTO,
     TerminateRequest,
@@ -1009,6 +1011,7 @@ def test_get_order_term(mock_request, client):
 import pytest
 from tapsilat_py.client import TapsilatAPI
 from tapsilat_py.models import (
+    OrderChargeRequest,
     OrderCreateDTO,
     BuyerDTO,
     OrderAccountingRequest,

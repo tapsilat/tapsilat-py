@@ -133,6 +133,7 @@ class CheckoutDesignDTO:
     text_color: Optional[str] = None
     pay_button_color: Optional[str] = None
     redirect_url: Optional[str] = None
+    placeholder_color: Optional[str] = None
 
 
 @dataclass
@@ -157,6 +158,9 @@ class PaymentTermDTO:
     status: Optional[str] = None
     term_reference_id: Optional[str] = None
     term_sequence: Optional[int] = None
+    hash_id: Optional[str] = None
+    id: Optional[int] = None
+    payments: Optional[List[Any]] = None
 
 
 @dataclass
@@ -703,3 +707,17 @@ class FileResponse:
         with open(destination, "wb") as f:
             f.write(self.content)
         return destination
+
+@dataclass
+class OrderChargeRequest:
+    order_reference_id: str
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+@dataclass
+class CreateOrganizationCurrencyPayload:
+    currency_code: str
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in asdict(self).items() if v is not None}

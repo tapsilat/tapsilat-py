@@ -16,7 +16,7 @@ markdown-it-py==4.2.0
 mdurl==0.1.2
 more-itertools==11.1.0
 nh3==0.3.6
-packaging==26.2
+packaging==26.3
 pluggy==1.6.0
 Pygments==2.20.0
 pyproject_hooks==1.2.0

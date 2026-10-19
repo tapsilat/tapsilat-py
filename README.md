@@ -192,16 +192,26 @@ term_reference_id = "TERM-123000456"
 client.delete_order_term(order_id,term_reference_id)
 ```
 ### Update order term
+The update replaces the term, so send every field. Dates use `YYYY-MM-DD`.
 ```python
-term = OrderPaymentTermUpdateDTO(term_reference_id="TERM-123000457",due_date="2025-12-10 00:00",required=True)
+term = OrderPaymentTermUpdateDTO(
+    term_reference_id="TERM-123000457",
+    term_sequence=2,
+    amount=5000,
+    due_date="2025-12-10",
+    paid_date=None,
+    required=True,
+    status="pending",
+)
 client.update_order_term(term)
 ```
 ### Refund order term
+`term_id` is the term's ID and `reference_id` the order's reference ID.
 ```python
-term_refund = OrderTermRefundRequest(term_reference_id="TERM-123000456",amount=1200)
+term_refund = OrderTermRefundRequest(term_id="term-id", reference_id="order-reference-id", amount=1200)
 client.refund_order_term(term_refund)
 ```
-### Terminate order term
+### Terminate order
 ```python
 reference_id = "mock-uuid-reference-id"
 client.order_terminate(reference_id)
@@ -239,59 +249,103 @@ settings = client.get_organization_settings()
 
 ### Callback URL Configuration
 ```python
-# Get callback settings
-callbacks = client.get_callback_settings()
+from tapsilat_py.models import CallbackURLDTO
 
-# Update callback settings
-client.update_callback_settings(
-    success_url="https://example.com/success",
-    fail_url="https://example.com/fail"
-)
+callbacks = client.get_organization_callback()
+client.update_organization_callback(CallbackURLDTO(callback_url="https://example.com/callback"))
 ```
 
-### Business and Currency
+### Currencies and Suborganizations
 ```python
-# Get currencies
-currencies = client.get_currencies()
+currencies = client.get_organization_currencies()
+presets = client.list_organization_currency_presets()
+client.create_organization_currency("USD")
 
-# Get VPOS list
-vpos_list = client.get_vpos_list()
+suborganizations = client.get_organization_suborganizations(page=1, per_page=10)
+suborganization = client.get_suborganization("suborganization-id")
 
-# Get Meta data
-meta_info = client.get_meta()
+meta = client.get_organization_meta("meta-name")
+limits = client.get_organization_limits("organization-id")
 ```
 
 ### User Management
 ```python
-# Create user
-client.create_user(
-    email="test@example.com", 
-    first_name="John", 
-    last_name="Doe", 
-    phone="+905551234567"
-)
+from tapsilat_py.models import OrgCreateUserReq, OrgUserTokenCreateRequest, OrgUserVerifyReq
 
-# Verify User Mobile
-client.verify_user_mobile(user_id="user-123", code="123456")
-
-# Verify User Email
-client.verify_user_email(user_id="user-123", code="123456")
+client.create_organization_user(OrgCreateUserReq(
+    conversation_id="user-1",
+    email="test@example.com",
+    first_name="John",
+    identity_number="11111111111",
+    is_mail_verified=False,
+    last_name="Doe",
+    phone="+905551234567",
+    reference_id="user-1",
+))
+token = client.create_organization_user_token(OrgUserTokenCreateRequest(user_id="user-id", expire=60))
+client.verify_organization_user(OrgUserVerifyReq(user_id="user-id"))
 ```
 
-### Limits
+`get_organization_limit_user` and `set_organization_limit_user` are deprecated: the API has no organization user limit route.
+
+## Card Installments and Charging
+
 ```python
-# Get Limits for a currency
-limits = client.get_limits("TRY")
+from tapsilat_py.models import CardInstallmentsRequest, InstallmentTableRequest, OrderChargeRequest
 
-# Set Limits
-client.set_limits([
-    {
-        "currency": "TRY", 
-        "min_amount": 10, 
-        "max_amount": 50000
-    }
-])
+options = client.get_card_installments(CardInstallmentsRequest(bin="54066200", amount=100, currency="TRY"))
+table = client.get_installment_table(InstallmentTableRequest(amount=100, currency="TRY"))
+
+charge = client.charge_order(OrderChargeRequest(order_reference_id="order-reference-id"))
+if not charge.get("isSuccess"):
+    print(charge.get("errorCode"), charge.get("message"))
 ```
+
+## Submerchants, VPOS and Tokenization
+
+Currency fields accept a currency UUID or an organization unit such as `TRY`; the server resolves units.
+
+```python
+from tapsilat_py.models import CardTokenizeRequest, SubmerchantCreateRequest, VposCreateRequest
+
+client.create_submerchant(SubmerchantCreateRequest(
+    locale="tr",
+    conversation_id="seller-1",
+    name="Example Ltd",
+    email="finance@example.test",
+    gsm_number="905551112233",
+    sub_merchant_type="PRIVATE_COMPANY",
+    tax_number="1234567890",
+    currency_id="TRY",
+))
+
+pos_list = client.list_vpos(page=1, per_page=20)
+card = client.tokenize_card(CardTokenizeRequest("4111111111111111", "John Doe", "12", "30", "123", user_id="customer-1"))
+```
+
+`update_vpos` and `update_submerchant` replace the stored record: read it first and send every field back. For example, leaving out `failover` or `tls` stores `false`.
+
+## Marketplace
+
+Marketplace methods use the API version 2 routes derived from `base_url`. Revisions are opaque strings: pass them back exactly as received.
+
+```python
+from tapsilat_py.models import MarketplacePayoutApproval, MarketplacePayoutOperationInput
+
+payout = client.get_marketplace_payout(payout_id)
+if payout["eligibility_status"] == "eligible" and payout["release_status"] == "awaiting_approval":
+    client.approve_marketplace_payouts(MarketplacePayoutApproval(ids=[payout["id"]]))
+
+client.run_marketplace_payout_operation(payout_id, MarketplacePayoutOperationInput(
+    kind="update_item",
+    idempotency_key="booking-123-allocation-change-1",
+    revision=payout["revision"],
+    seller_reference=seller["routing_reference"],
+    net_amount="60.25",
+))
+```
+
+Approval policies need a currency UUID; `create_marketplace_approval_policy` and `update_marketplace_approval_policy` resolve units such as `TRY` for you, and `client.resolve_currency_id("TRY")` exposes the same lookup.
 
 ## System & Webhooks
 
@@ -408,7 +462,7 @@ print(f"Redirect to: {response.url}")
 
 ## Error Handling
 
-All API methods raise `APIException` on errors:
+All API methods raise `APIException` on errors. Besides `status_code`, `code` and `error` (also available as `message`), it carries the body's `status`, per-field validation `errors` and the `raw_body`. Most "not found" errors arrive as HTTP 400, and rejected state changes (for example approving an ineligible payout) as HTTP 424. A successful status with an HTML body, which a deployment serving the panel UI returns for unknown routes, also raises `APIException`.
 
 ```python
 from tapsilat_py.exceptions import APIException

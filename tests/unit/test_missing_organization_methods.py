@@ -87,10 +87,10 @@ def test_get_organization_limits(mock_request, client):
     mock_response.json.return_value = {"success": True}
     mock_request.return_value = mock_response
 
-    response = client.get_organization_limits()
+    response = client.get_organization_limits("org_1")
     assert response == {"success": True}
     mock_request.assert_called_once()
-    assert "/organization/limits" in mock_request.call_args[0][1]
+    assert mock_request.call_args[0][1].endswith("/organization/org_1/limits")
 
 @patch('tapsilat_py.client.requests.request')
 def test_list_organization_vpos(mock_request, client):
@@ -118,7 +118,7 @@ def test_get_organization_meta(mock_request, client):
     response = client.get_organization_meta("meta_name")
     assert response == {"success": True}
     mock_request.assert_called_once()
-    assert "/organization/meta/meta_name" in mock_request.call_args[0][1]
+    assert mock_request.call_args[0][1].endswith("/organization/metas/meta_name")
 
 @patch('tapsilat_py.client.requests.request')
 def test_get_organization_scopes(mock_request, client):

@@ -11,6 +11,8 @@ import requests
 from .exceptions import APIException
 from .models import (
     OrderAccountingRequest,
+    OrderChargeRequest,
+    CreateOrganizationCurrencyPayload,
     OrderCreateDTO,
     OrderPaymentTermCreateDTO,
     OrderPostAuthRequest,
@@ -43,10 +45,14 @@ from .models import (
     CardInstallmentsRequest,
     GetOrderPaymentsRequest,
     InstallmentTableRequest,
-    OrderChargeRequest,
     OrgUserTokenCreateRequest,
     SubmerchantPaymentAction,
     SubmerchantPaymentItemUpdate,
+    OrderPaymentOptionsUpdateDTO,
+    SplitOrderItemPaymentDTO,
+    OrderOIPDTO,
+    OrgUserTokenCreateReq,
+    FileResponse,
 )
 from .marketplace import MarketplaceMixin
 from .submerchants import SubmerchantMixin
@@ -84,6 +90,7 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
         params: Optional[Dict[str, Any]] = None,
         json_payload: Optional[Dict[str, Any]] = None,
         version: Optional[str] = None,
+        raw_response: bool = False,
     ) -> Any:
         base_url = self._versioned_base_url(version) if version else self.base_url
         url = f"{base_url}/{endpoint.lstrip('/')}"
@@ -101,6 +108,13 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
         except requests.exceptions.RequestException as e:
             raise APIException(0, -1, str(e)) from e
 
+        status_code = getattr(response, "status_code", 200)
+        if raw_response and not (isinstance(status_code, int) and status_code >= 400):
+            filename = "download"
+            disposition = response.headers.get("Content-Disposition")
+            if isinstance(disposition, str) and "filename=" in disposition:
+                filename = disposition.split("filename=")[-1].strip('"')
+            return FileResponse(response.content, filename)
         return self._parse_response(response)
 
     def _parse_response(self, response: Any) -> Any:
@@ -224,6 +238,38 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
 
     def get_system_order_statuses(self) -> dict:
         endpoint = "/system/order-statuses"
+        return self._make_request("GET", endpoint)
+
+    def get_system_basket_item_types(self) -> dict:
+        endpoint = "/system/basket-item-types"
+        return self._make_request("GET", endpoint)
+
+    def get_system_error_codes(self) -> dict:
+        endpoint = "/system/error-codes"
+        return self._make_request("GET", endpoint)
+
+    def get_system_payment_term_statuses(self) -> dict:
+        endpoint = "/system/payment-term-statuses"
+        return self._make_request("GET", endpoint)
+
+    def get_system_product_types(self) -> dict:
+        endpoint = "/system/product-types"
+        return self._make_request("GET", endpoint)
+
+    def get_system_shortcut_types(self) -> dict:
+        endpoint = "/system/shortcut-types"
+        return self._make_request("GET", endpoint)
+
+    def get_system_transaction_payment_types(self) -> dict:
+        endpoint = "/system/transaction-payment-types"
+        return self._make_request("GET", endpoint)
+
+    def get_system_transaction_purposes(self) -> dict:
+        endpoint = "/system/transaction-purposes"
+        return self._make_request("GET", endpoint)
+
+    def get_system_transaction_statuses(self) -> dict:
+        endpoint = "/system/transaction-statuses"
         return self._make_request("GET", endpoint)
 
     def get_order(self, reference_id: str) -> OrderResponse:
@@ -413,6 +459,24 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
             OrderRelatedReferenceDTO(reference_id=reference_id, related_reference_id=related_reference_id)
         )
 
+    def update_payment_options(self, request: OrderPaymentOptionsUpdateDTO) -> dict:
+        endpoint = "/order/payment-options"
+        payload = request.to_dict()
+        return self._make_request("PATCH", endpoint, json_payload=payload)
+
+    def split_order_item_payment(self, request: SplitOrderItemPaymentDTO) -> dict:
+        endpoint = "/order/split"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def order_callback(self, id: str) -> dict:
+        endpoint = f"/orders/{id}/callback"
+        return self._make_request("GET", endpoint)
+
+    def order_vpos_query(self, id: str) -> dict:
+        endpoint = f"/orders/{id}/vpos-query"
+        return self._make_request("GET", endpoint)
+
     def add_basket_item(self, request: AddBasketItemRequest) -> dict:
         endpoint = "/order/basket-item"
         payload = request.to_dict()
@@ -431,12 +495,26 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
     def get_orders(
         self, page: str = "1", per_page: str = "10", buyer_id: str = ""
     ) -> dict:
-        """Get orders with pagination and optional buyer filter"""
-        endpoint = "/order/list"
-        params = {"page": page, "per_page": per_page}
-        if buyer_id:
-            params["buyer_id"] = buyer_id
-        return self._make_request("GET", endpoint, params=params)
+        """DEPRECATED: Use get_order_list instead. Get orders with pagination and optional buyer filter"""
+        return self.get_order_list(page=int(page), per_page=int(per_page), buyer_id=buyer_id)
+
+    def get_order_pdf(self, id: str) -> FileResponse:
+        endpoint = f"/order/{self._path_id(id, 'id')}/export/pdf"
+        return self._make_request("GET", endpoint, raw_response=True)
+
+    def get_order_excel(self, id: str) -> FileResponse:
+        endpoint = f"/order/{self._path_id(id, 'id')}/export/excel"
+        return self._make_request("GET", endpoint, raw_response=True)
+
+    def create_order_refund_request(self, request: RefundOrderDTO) -> dict:
+        endpoint = "/order/refund-request"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
+
+    def add_order_oip(self, request: OrderOIPDTO) -> dict:
+        endpoint = "/order/oip"
+        payload = request.to_dict()
+        return self._make_request("POST", endpoint, json_payload=payload)
 
     def get_organization_settings(self) -> dict:
         """Get organization settings"""
@@ -494,9 +572,19 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
         return self._make_request("POST", endpoint, json_payload=payload)
 
     def get_organization_limits(self, organization_id: Optional[str] = None) -> dict:
-        """Get an organization's transaction limits"""
+        """Get an organization's transaction limits.
+
+        Calling it without ``organization_id`` is deprecated: the API has no
+        ``/organization/limits`` route, so that request always fails.
+        """
         if not organization_id:
-            raise ValueError("organization_id is required: limits are read per organization")
+            warnings.warn(
+                "get_organization_limits without organization_id calls a route the API does not provide; "
+                "pass the organization ID",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return self._make_request("GET", "/organization/limits")
         endpoint = f"/organization/{quote(organization_id, safe='')}/limits"
         return self._make_request("GET", endpoint)
 
@@ -539,6 +627,18 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
     def list_organization_currency_presets(self) -> dict:
         return self._make_request("GET", "/organization/currency-presets")
 
+    def get_organization_suborganization_details(self, id: str) -> dict:
+        """Get Sub-Organization Details"""
+        return self.get_suborganization(id)
+
+    def get_organization_suborganization_submerchants(self, id: str) -> dict:
+        """Get Sub-Organization Submerchants"""
+        return self.get_submerchant_by_suborganization(id)
+
+    def get_organization_currency_presets(self) -> dict:
+        """Get Organization Currency Presets"""
+        return self.list_organization_currency_presets()
+
     def create_organization_currency(self, currency_code: str) -> dict:
         """Add a currency to the organization by ISO code, for example USD"""
         response = self._make_request(
@@ -549,7 +649,9 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
         self._currency_ids_by_unit = None
         return response
 
-    def create_organization_user_token(self, request: OrgUserTokenCreateRequest) -> dict:
+    def create_organization_user_token(
+        self, request: Union[OrgUserTokenCreateRequest, OrgUserTokenCreateReq]
+    ) -> dict:
         """Create an access token for an organization user; ``expire`` is in minutes"""
         return self._make_request(
             "POST", "/organization/user/token", json_payload=request.to_dict()
@@ -627,6 +729,31 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
         endpoint = "/subscription/redirect"
         payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
+
+
+    def create_org_currency(self, payload: CreateOrganizationCurrencyPayload) -> Dict[str, Any]:
+        return self.create_organization_currency(payload.currency_code)
+
+    def get_org_metadata(self, name: str) -> Dict[str, Any]:
+        endpoint = f"/organization/metas/{quote(name, safe='')}"
+        return self._make_request("GET", endpoint)
+
+    def get_org_partners(self) -> Dict[str, Any]:
+        endpoint = "/organization/partners"
+        return self._make_request("GET", endpoint)
+
+    def get_org_limits(self, org_id: str, currency: str = None, operation: str = None) -> Dict[str, Any]:
+        endpoint = f"/organization/{self._path_id(org_id, 'org_id')}/limits"
+        params = {}
+        if currency:
+            params['currency'] = currency
+        if operation:
+            params['operation'] = operation
+        return self._make_request("GET", endpoint, params=params)
+
+    def get_system_config(self) -> Dict[str, Any]:
+        endpoint = "/system/config"
+        return self._make_request("GET", endpoint)
 
     @staticmethod
     def verify_webhook(payload: str, signature: str, secret: str) -> bool:

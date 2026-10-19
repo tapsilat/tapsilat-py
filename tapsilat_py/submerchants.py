@@ -13,8 +13,8 @@ class SubmerchantMixin:
         """Create a submerchant; the response carries only code and message"""
         return self._make_request("POST", "/submerchants", json_payload=request.to_dict())
 
-    def get_submerchant(self, submerchant_id: str) -> dict:
-        endpoint = f"/submerchants/{self._path_id(submerchant_id, 'submerchant_id')}"
+    def get_submerchant(self, id: str) -> dict:
+        endpoint = f"/submerchants/{self._path_id(id, 'id')}"
         return self._make_request("GET", endpoint)
 
     def list_submerchants(self, page: int = 1, per_page: int = 10) -> dict:
@@ -23,17 +23,17 @@ class SubmerchantMixin:
             "GET", "/submerchants", params={"page": page, "per_page": per_page}
         )
 
-    def update_submerchant(self, submerchant_id: str, request: SubmerchantUpdateRequest) -> dict:
+    def update_submerchant(self, id: str, request: SubmerchantUpdateRequest) -> dict:
         """Replace the submerchant profile; send every field"""
-        endpoint = f"/submerchants/{self._path_id(submerchant_id, 'submerchant_id')}"
+        endpoint = f"/submerchants/{self._path_id(id, 'id')}"
         return self._make_request("PATCH", endpoint, json_payload=request.to_dict())
 
-    def delete_submerchant(self, submerchant_id: str) -> dict:
-        endpoint = f"/submerchants/{self._path_id(submerchant_id, 'submerchant_id')}"
+    def delete_submerchant(self, id: str) -> dict:
+        endpoint = f"/submerchants/{self._path_id(id, 'id')}"
         return self._make_request("DELETE", endpoint)
 
-    def get_suborganization_by_submerchant(self, submerchant_id: str) -> dict:
-        endpoint = f"/submerchants/{self._path_id(submerchant_id, 'submerchant_id')}/suborganization"
+    def get_suborganization_by_submerchant(self, id: str) -> dict:
+        endpoint = f"/submerchants/{self._path_id(id, 'id')}/suborganization"
         return self._make_request("GET", endpoint)
 
     def record_submerchant_payout_event(self, request: SubmerchantPayoutEventRequest) -> dict:

@@ -107,10 +107,14 @@ def test_get_organization_limits(mock_request, client):
     mock_response.json.return_value = {"success": True}
     mock_request.return_value = mock_response
 
-    response = client.get_organization_limits()
+    with pytest.deprecated_call():
+        response = client.get_organization_limits()
     assert response == {"success": True}
     mock_request.assert_called_once()
     assert "/organization/limits" in mock_request.call_args[0][1]
+
+    response = client.get_organization_limits("org/1")
+    assert mock_request.call_args[0][1].endswith("/organization/org%2F1/limits")
 
 @patch('tapsilat_py.client.requests.request')
 def test_list_organization_vpos(mock_request, client):

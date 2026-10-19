@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, fields, is_dataclass
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 def _asdict_factory(data):
@@ -38,10 +38,10 @@ class BuyerDTO:
     registration_date: Optional[str] = None
     title: Optional[str] = None
     zip_code: Optional[str] = None
-    registration_address: Optional[str] = None
     income_type: Optional[str] = None
     education: Optional[str] = None
     occupation: Optional[str] = None
+    registration_address: Optional[str] = None
 
 
 @dataclass
@@ -99,6 +99,8 @@ class BasketItemDTO:
     status: Optional[int] = None
     sub_merchant_key: Optional[str] = None
     sub_merchant_price: Optional[str] = None
+    # RFC3339 timestamp before which the item's marketplace payout is not released
+    payout_release_at: Optional[str] = None
 
 
 @dataclass
@@ -128,11 +130,22 @@ class CheckoutDesignDTO:
     label_text_color: Optional[str] = None
     left_background_color: Optional[str] = None
     logo: Optional[str] = None
+    # Deprecated: checkout no longer renders custom order detail HTML; the value is ignored
     order_detail_html: Optional[str] = None
     right_background_color: Optional[str] = None
     text_color: Optional[str] = None
     pay_button_color: Optional[str] = None
+    # Deprecated: ignored by checkout; use the order's redirect_success_url and redirect_failure_url
     redirect_url: Optional[str] = None
+    pay_button_text_color: Optional[str] = None
+    page_background_color: Optional[str] = None
+    border_color: Optional[str] = None
+    input_border_color: Optional[str] = None
+    accent_color: Optional[str] = None
+    text_muted_color: Optional[str] = None
+    surface_muted_color: Optional[str] = None
+    dark_mode_enabled: Optional[bool] = None
+    dark_colors: Optional[Dict[str, str]] = None
     placeholder_color: Optional[str] = None
 
 
@@ -150,6 +163,8 @@ class OrderCardDTO:
 
 @dataclass
 class PaymentTermDTO:
+    """Payment term sent with order creation; due_date and paid_date must be RFC3339 timestamps"""
+
     amount: Optional[float] = None
     data: Optional[str] = None
     due_date: Optional[str] = None
@@ -345,6 +360,12 @@ class OrderRelatedReferenceDTO:
 
 @dataclass
 class OrderPaymentTermCreateDTO:
+    """Adds a payment term to an order.
+
+    ``order_id`` is the order's ID (``order_id`` from order creation), not its
+    reference ID. Dates use YYYY-MM-DD.
+    """
+
     order_id: str
     term_reference_id: str
     amount: float
@@ -361,6 +382,8 @@ class OrderPaymentTermCreateDTO:
 
 @dataclass
 class OrderTermRefundRequest:
+    """Refunds a payment term; ``term_id`` is the term's ID and ``reference_id`` the order's reference ID (required)"""
+
     term_id: str
     amount: float
     reference_id: Optional[str] = None
@@ -426,6 +449,9 @@ class SubscriptionCreateRequest:
     success_url: Optional[str] = None
     title: Optional[str] = None
     user: Optional[SubscriptionUser] = None
+    # day, week, month or year
+    interval: Optional[str] = None
+    interval_count: Optional[int] = None
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
@@ -515,6 +541,8 @@ class OrderPaymentTermDeleteDTO:
 
 @dataclass
 class OrderPaymentTermUpdateDTO:
+    """Replaces a payment term: the server stores every field as sent. Dates use YYYY-MM-DD."""
+
     amount: float
     due_date: str
     paid_date: Optional[str]
@@ -609,6 +637,434 @@ class OrgUserMobileVerifyReq:
         return _asdict_factory(self)
 
 
+# Order payments, charging and submerchant payment actions
+
+
+@dataclass
+class GetOrderPaymentsRequest:
+    """Identifies an order by any one of its identifiers"""
+
+    order_id: Optional[str] = None
+    order_reference_id: Optional[str] = None
+    conversation_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class OrderChargeRequest:
+    order_reference_id: str
+    retry: Optional[bool] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class SubmerchantPaymentAction:
+    locale: str
+    conversation_id: str
+    payment_transaction_id: str
+    acquirer: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class SubmerchantPaymentItemUpdate:
+    locale: str
+    conversation_id: str
+    payment_transaction_id: str
+    sub_merchant_key: str
+    # Positive decimal amount as a string, for example "60.25"
+    sub_merchant_price: str
+    acquirer: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+# Card installments
+
+
+@dataclass
+class CardInstallmentsRequest:
+    # The card's first digits (at least 8)
+    bin: str
+    amount: float
+    # Currency unit or name, for example "TRY"
+    currency: str
+    is_three_d: Optional[bool] = None
+
+    def to_params(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class InstallmentTableRequest:
+    amount: float
+    currency: str
+    is_three_d: Optional[bool] = None
+
+    def to_params(self) -> dict:
+        return _asdict_factory(self)
+
+
+# Organization
+
+
+@dataclass
+class OrgUserTokenCreateRequest:
+    """Creates an access token for an organization user; ``expire`` is in minutes"""
+
+    email: Optional[str] = None
+    expire: Optional[int] = None
+    invalidate_old_tokens: Optional[bool] = None
+    user_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+# Submerchants
+
+
+@dataclass
+class SubmerchantCreateRequest:
+    """Creates or replaces a submerchant.
+
+    ``currency_id`` accepts a currency UUID or an organization currency unit
+    such as "TRY". ``sub_merchant_type`` is PERSONAL (requires
+    identity_number), PRIVATE_COMPANY or LIMITED_OR_JOINT_STOCK_COMPANY (both
+    require tax_number). Updates replace the profile, so send every field.
+    """
+
+    locale: str
+    conversation_id: str
+    name: str
+    email: str
+    gsm_number: str
+    address: Optional[str] = None
+    iban: Optional[str] = None
+    tax_office: Optional[str] = None
+    legal_company_title: Optional[str] = None
+    currency_id: Optional[str] = None
+    sub_merchant_external_id: Optional[str] = None
+    identity_number: Optional[str] = None
+    sub_merchant_type: Optional[str] = None
+    tax_number: Optional[str] = None
+    sub_merchant_key: Optional[str] = None
+    organization_id: Optional[str] = None
+    status: Optional[str] = None
+    system_time: Optional[int] = None
+    contact_name: Optional[str] = None
+    contact_surname: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+SubmerchantUpdateRequest = SubmerchantCreateRequest
+
+
+@dataclass
+class MarketplaceAccountTarget:
+    vpos_id: str
+    # TEST or PROD
+    environment: str
+
+
+@dataclass
+class MarketplaceSubmerchantCreateRequest(SubmerchantCreateRequest):
+    """Creates a marketplace seller.
+
+    Omit both ``vpos_id`` and ``provider_accounts`` to create only the logical
+    seller; never combine them. Reuse the same ``idempotency_key`` and data
+    when retrying.
+    """
+
+    provider_accounts: Optional[List[MarketplaceAccountTarget]] = None
+    labels: Optional[List[str]] = None
+    vpos_id: Optional[str] = None
+    # auto or manual
+    approval_mode: Optional[str] = None
+    release_policy_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+
+
+@dataclass
+class SubmerchantPayoutEventRequest:
+    idempotency_key: str
+    order_reference: str
+    item_id: str
+    event_type: str
+    # RFC3339 timestamp
+    occurred_at: Optional[str] = None
+    payload: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+# VPOS
+
+
+@dataclass
+class VposCreateRequest:
+    """VPOS configuration.
+
+    Updates replace the stored configuration, so fields left out are stored
+    as empty or false: read the VPOS first and send every field back.
+    ``currencies`` accepts currency UUIDs or units such as "TRY".
+    """
+
+    name: str
+    acquirer_id: str
+    currencies: List[str]
+    bank_name: Optional[str] = None
+    env_mode: Optional[str] = None
+    merchant: Optional[str] = None
+    merchant_code: Optional[str] = None
+    merchant_key: Optional[str] = None
+    auth_key: Optional[str] = None
+    terminal: Optional[str] = None
+    company: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    store_key: Optional[str] = None
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+    guid: Optional[str] = None
+    pid: Optional[str] = None
+    client_id: Optional[str] = None
+    client_code: Optional[str] = None
+    type: Optional[str] = None
+    block_date: Optional[int] = None
+    priority: Optional[int] = None
+    main: Optional[bool] = None
+    force_three_d: Optional[bool] = None
+    marketplace: Optional[bool] = None
+    pf: Optional[bool] = None
+    payment_mode: Optional[str] = None
+    prefix: Optional[str] = None
+    card_schemes: Optional[List[str]] = None
+    failover: Optional[bool] = None
+    pf_id: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    tls: Optional[bool] = None
+    tls_key: Optional[str] = None
+    tls_cert: Optional[str] = None
+    root_ca: Optional[str] = None
+    main_installment: Optional[bool] = None
+    main_without_installment: Optional[bool] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+VposUpdateRequest = VposCreateRequest
+
+
+@dataclass
+class VposSubmerchantCreateRequest:
+    vpos_id: str
+    external_reference_id: Optional[str] = None
+    submerchant_id: Optional[str] = None
+    terminal_no: Optional[str] = None
+    mcc: Optional[str] = None
+    tax_id: Optional[str] = None
+    national_id: Optional[str] = None
+    title: Optional[str] = None
+    switch_id: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    country_isocode: Optional[str] = None
+    postal_code: Optional[str] = None
+    address: Optional[str] = None
+    submerchant_url: Optional[str] = None
+    submerchant_nin: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class VposSubmerchantUpdateRequest:
+    external_reference_id: Optional[str] = None
+    submerchant_id: Optional[str] = None
+    terminal_no: Optional[str] = None
+    mcc: Optional[str] = None
+    tax_id: Optional[str] = None
+    national_id: Optional[str] = None
+    title: Optional[str] = None
+    switch_id: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+# Card tokenization
+
+
+@dataclass
+class CardTokenizeRequest:
+    card_number: str
+    holder_name: str
+    expiry_month: str
+    # Two or four digits
+    expiry_year: str
+    cvv: str
+    name: Optional[str] = None
+    default: Optional[bool] = None
+    # 1 = 3D secure, 2 = half secure, 3 = non-secure
+    mode: Optional[int] = None
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
+    redirect_success_url: Optional[str] = None
+    redirect_failure_url: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+# Marketplace (API version 2)
+
+
+@dataclass
+class MarketplaceProfileUpdate(SubmerchantCreateRequest):
+    """Replaces a marketplace seller profile at ``revision``.
+
+    ``revision`` comes from ``get_marketplace_submerchant`` and must be sent
+    back exactly as received. Preserve fields you are not changing.
+    """
+
+    revision: str = ""
+    labels: Optional[List[str]] = None
+    approval_mode: Optional[str] = None
+    release_policy_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+
+
+@dataclass
+class MarketplaceContractFilter:
+    # Currency UUID or unit such as "TRY"
+    currency_id: str
+    seller_type: str
+    operation: str
+    vpos_ids: List[str]
+
+
+@dataclass
+class MarketplaceAccountAction:
+    """Confirms an account action using the account's latest revision and environment"""
+
+    # create, retry, resubmit, update, retrieve or retry_sync
+    action: str
+    environment: str
+    revision: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class MarketplacePayoutFilter:
+    order_id: Optional[str] = None
+    submerchant_id: Optional[str] = None
+    vpos_id: Optional[str] = None
+    provider: Optional[str] = None
+    status: Optional[str] = None
+    release_status: Optional[str] = None
+    approval_mode: Optional[str] = None
+    # Currency unit such as "TRY"
+    currency: Optional[str] = None
+    eligibility: Optional[str] = None
+    search: Optional[str] = None
+    min_amount: Optional[str] = None
+    max_amount: Optional[str] = None
+    # YYYY-MM-DD
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    page: int = 1
+    per_page: int = 20
+
+    def to_params(self) -> dict:
+        return {k: v for k, v in _asdict_factory(self).items() if v != ""}
+
+
+@dataclass
+class MarketplacePayoutApproval:
+    # At most 100 payout IDs
+    ids: List[str]
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class MarketplaceApprovalPolicyInput:
+    """Creates or replaces an approval rule.
+
+    ``currency_id`` must be a UUID on the wire; the client resolves units such
+    as "TRY" before sending.
+    """
+
+    name: str
+    priority: int
+    mode: str
+    enabled: Optional[bool] = None
+    provider: Optional[str] = None
+    min_amount: Optional[str] = None
+    max_amount: Optional[str] = None
+    currency_id: Optional[str] = None
+    submerchant_ids: Optional[List[str]] = None
+    labels_any: Optional[List[str]] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class MarketplaceReleasePolicyInput:
+    name: str
+    enabled: Optional[bool] = None
+    default: Optional[bool] = None
+    minimum_delay_seconds: Optional[int] = None
+    explicit_not_before: Optional[str] = None
+    required_external_event: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class MarketplaceApprovalSettings:
+    # auto or manual
+    default_mode: str
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class MarketplacePayoutOperationInput:
+    # disapprove or update_item
+    kind: str
+    idempotency_key: str
+    # The payout's current revision, sent back exactly as received
+    revision: str
+    seller_reference: Optional[str] = None
+    net_amount: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+# Added on main
+
+
 @dataclass
 class OrderPaymentOptionsUpdateDTO:
     payment_options: List[str]
@@ -623,15 +1079,6 @@ class SplitOrderItemPaymentDTO:
     amount: float
     order_id: str
     order_item_payment_id: str
-
-    def to_dict(self) -> dict:
-        return _asdict_factory(self)
-
-@dataclass
-class GetOrderPaymentsRequest:
-    order_id: Optional[str] = None
-    order_reference_id: Optional[str] = None
-    conversation_id: Optional[str] = None
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
@@ -708,12 +1155,6 @@ class FileResponse:
             f.write(self.content)
         return destination
 
-@dataclass
-class OrderChargeRequest:
-    order_reference_id: str
-
-    def to_dict(self) -> dict:
-        return {k: v for k, v in asdict(self).items() if v is not None}
 
 @dataclass
 class CreateOrganizationCurrencyPayload:

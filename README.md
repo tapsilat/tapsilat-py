@@ -134,7 +134,7 @@ status = client.get_order_status("reference_id")
 transactions = client.get_order_transactions("reference_id")
 payment_details = client.get_order_payment_details_by_id("reference_id")
 payment_details_dto = client.get_order_payment_details(OrderPaymentDetailDTO(reference_id="reference_id"))
-payments = client.get_order_payments(GetOrderPaymentsRequest(order_id="order_id"))
+payments = client.get_order_payments(GetOrderPaymentsRequest(order_reference_id="reference_id"))
 
 # Modifications
 client.cancel_order(CancelOrderDTO(reference_id="reference_id"))
@@ -168,7 +168,7 @@ from tapsilat_py.models import (
     OrderPaymentTermCreateDTO, OrderPaymentTermDeleteDTO, OrderPaymentTermUpdateDTO, OrderTermRefundRequest
 )
 
-# Create
+# Create: order_id is the order's ID (not its reference ID); dates use YYYY-MM-DD
 term_create = OrderPaymentTermCreateDTO(order_id="order_id", term_reference_id="term_ref", amount=5000, due_date="2025-10-10", term_sequence=1, required=True, status="pending")
 client.create_order_term(term_create)
 
@@ -179,8 +179,8 @@ client.get_order_term("term_reference_id")
 client.update_order_term(OrderPaymentTermUpdateDTO(term_reference_id="term_ref", due_date="2025-12-10", required=True, amount=5000, status="pending", term_sequence=1, paid_date=None))
 client.delete_order_term(OrderPaymentTermDeleteDTO(order_id="order_id", term_reference_id="term_ref"))
 
-# Refund
-client.refund_order_term(OrderTermRefundRequest(term_id="term_id", amount=1200))
+# Refund: term_id is the term's ID and reference_id the order's reference ID
+client.refund_order_term(OrderTermRefundRequest(term_id="term_id", reference_id="order_reference_id", amount=1200))
 ```
 
 ### Raw File Downloads (PDF, Excel)
@@ -226,10 +226,8 @@ client.create_organization_business(OrgCreateBusinessRequest(business_name="Test
 currencies = client.get_organization_currencies()
 vpos_list = client.list_organization_vpos(GetVposRequest(currency_id="currency_id"))
 
-# Limits
-limits = client.get_organization_limits()
-client.get_organization_limit_user(GetUserLimitRequest(user_id="user_id"))
-client.set_organization_limit_user(SetLimitUserRequest(limit_id="limit_id", user_id="user_id"))
+# Limits (the organization user limit methods are deprecated: the API has no such route)
+limits = client.get_organization_limits("organization_id")
 
 # Suborganizations
 client.get_organization_suborganizations()
@@ -240,8 +238,67 @@ client.get_organization_suborganization_submerchants("suborg_id")
 client.create_organization_user(OrgCreateUserReq(email="test@example.com", first_name="John", ...))
 client.verify_organization_user(OrgUserVerifyReq(user_id="user_id"))
 client.verify_organization_user_mobile(OrgUserMobileVerifyReq(user_id="user_id"))
-client.create_organization_user_token(OrgUserTokenCreateReq(email="test@example.com", expire=3600))
+client.create_organization_user_token(OrgUserTokenCreateRequest(email="test@example.com", expire=60))  # minutes
 ```
+
+## Card Installments and Charging
+
+```python
+from tapsilat_py.models import CardInstallmentsRequest, InstallmentTableRequest, OrderChargeRequest
+
+options = client.get_card_installments(CardInstallmentsRequest(bin="54066200", amount=100, currency="TRY"))
+table = client.get_installment_table(InstallmentTableRequest(amount=100, currency="TRY"))
+
+charge = client.charge_order(OrderChargeRequest(order_reference_id="order-reference-id"))
+if not charge.get("isSuccess"):
+    print(charge.get("errorCode"), charge.get("message"))
+```
+
+## Submerchants, VPOS and Tokenization
+
+Currency fields accept a currency UUID or an organization unit such as `TRY`; the server resolves units.
+
+```python
+from tapsilat_py.models import CardTokenizeRequest, SubmerchantCreateRequest, VposCreateRequest
+
+client.create_submerchant(SubmerchantCreateRequest(
+    locale="tr",
+    conversation_id="seller-1",
+    name="Example Ltd",
+    email="finance@example.test",
+    gsm_number="905551112233",
+    sub_merchant_type="PRIVATE_COMPANY",
+    tax_number="1234567890",
+    currency_id="TRY",
+))
+
+pos_list = client.list_vpos(page=1, per_page=20)
+card = client.tokenize_card(CardTokenizeRequest("4111111111111111", "John Doe", "12", "30", "123", user_id="customer-1"))
+```
+
+`update_vpos` and `update_submerchant` replace the stored record: read it first and send every field back. For example, leaving out `failover` or `tls` stores `false`.
+
+## Marketplace
+
+Marketplace methods use the API version 2 routes derived from `base_url`. Revisions are opaque strings: pass them back exactly as received.
+
+```python
+from tapsilat_py.models import MarketplacePayoutApproval, MarketplacePayoutOperationInput
+
+payout = client.get_marketplace_payout(payout_id)
+if payout["eligibility_status"] == "eligible" and payout["release_status"] == "awaiting_approval":
+    client.approve_marketplace_payouts(MarketplacePayoutApproval(ids=[payout["id"]]))
+
+client.run_marketplace_payout_operation(payout_id, MarketplacePayoutOperationInput(
+    kind="update_item",
+    idempotency_key="booking-123-allocation-change-1",
+    revision=payout["revision"],
+    seller_reference=seller["routing_reference"],
+    net_amount="60.25",
+))
+```
+
+Approval policies need a currency UUID; `create_marketplace_approval_policy` and `update_marketplace_approval_policy` resolve units such as `TRY` for you, and `client.resolve_currency_id("TRY")` exposes the same lookup.
 
 ## System & Webhooks
 
@@ -366,7 +423,7 @@ print(f"Redirect to: {response.url}")
 
 ## Error Handling
 
-All API methods raise `APIException` on errors:
+All API methods raise `APIException` on errors. Besides `status_code`, `code` and `error` (also available as `message`), it carries the body's `status`, per-field validation `errors` and the `raw_body`. Most "not found" errors arrive as HTTP 400, and rejected state changes (for example approving an ineligible payout) as HTTP 424. A successful status with an HTML body, which a deployment serving the panel UI returns for unknown routes, also raises `APIException`.
 
 ```python
 from tapsilat_py.exceptions import APIException

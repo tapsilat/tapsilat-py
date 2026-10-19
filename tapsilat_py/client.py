@@ -1,7 +1,11 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import hmac
+import re
+import warnings
 import hashlib
+from urllib.parse import quote, urlsplit, urlunsplit
+
 import requests
 
 from .exceptions import APIException
@@ -38,19 +42,30 @@ from .models import (
     RemoveBasketItemRequest,
     UpdateBasketItemRequest,
     CallbackURLDTO,
+    CardInstallmentsRequest,
+    GetOrderPaymentsRequest,
+    InstallmentTableRequest,
+    OrgUserTokenCreateRequest,
+    SubmerchantPaymentAction,
+    SubmerchantPaymentItemUpdate,
     OrderPaymentOptionsUpdateDTO,
     SplitOrderItemPaymentDTO,
-    GetOrderPaymentsRequest,
     OrderOIPDTO,
     OrgUserTokenCreateReq,
-    SubmerchantCreateDTO,
-    SubmerchantUpdateDTO,
     FileResponse,
 )
+from .marketplace import MarketplaceMixin
+from .submerchants import SubmerchantMixin
+from .tokenization import TokenizationMixin
 from .validators import validate_gsm_number, validate_installments
+from .vpos import VposMixin
+
+_UUID_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
 
 
-class TapsilatAPI:
+class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMixin):
     def __init__(
         self,
         api_key: str = "",
@@ -60,6 +75,7 @@ class TapsilatAPI:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
+        self._currency_ids_by_unit: Optional[Dict[str, str]] = None
 
     def _get_headers(self):
         headers = {"Accept": "application/json"}
@@ -73,9 +89,11 @@ class TapsilatAPI:
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
         json_payload: Optional[Dict[str, Any]] = None,
+        version: Optional[str] = None,
         raw_response: bool = False,
     ) -> Any:
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        base_url = self._versioned_base_url(version) if version else self.base_url
+        url = f"{base_url}/{endpoint.lstrip('/')}"
         headers = self._get_headers()
 
         try:
@@ -87,37 +105,92 @@ class TapsilatAPI:
                 headers=headers,
                 timeout=self.timeout,
             )
-            response.raise_for_status()
-
-            if raw_response:
-                filename = "download"
-                cd = response.headers.get("Content-Disposition")
-                if cd and "filename=" in cd:
-                    filename = cd.split("filename=")[-1].strip('"')
-                return FileResponse(response.content, filename)
-
-            if response.content:
-                return response.json()
-            return {}
-        except requests.exceptions.HTTPError as e:
-            resp_status_code = e.response.status_code if e.response is not None else 0
-            api_code_from_json = -1
-            error_msg = "Unknown API error"
-
-            if e.response is not None:
-                try:
-                    if e.response.content:
-                        error_data = e.response.json()
-                        api_code_from_json = error_data.get("code", -1)
-                        error_msg = error_data.get("error", e.response.text)
-                    else:
-                        error_msg = e.response.reason or "HTTP error with no content"
-                except requests.exceptions.JSONDecodeError:
-                    error_msg = e.response.text
-
-            raise APIException(resp_status_code, api_code_from_json, error_msg) from e
         except requests.exceptions.RequestException as e:
             raise APIException(0, -1, str(e)) from e
+
+        status_code = getattr(response, "status_code", 200)
+        if raw_response and not (isinstance(status_code, int) and status_code >= 400):
+            filename = "download"
+            disposition = response.headers.get("Content-Disposition")
+            if isinstance(disposition, str) and "filename=" in disposition:
+                filename = disposition.split("filename=")[-1].strip('"')
+            return FileResponse(response.content, filename)
+        return self._parse_response(response)
+
+    def _parse_response(self, response: Any) -> Any:
+        status_code = getattr(response, "status_code", 200)
+        if not isinstance(status_code, int):
+            status_code = 200
+        content = response.content or b""
+        raw_body = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else str(content)
+
+        if status_code >= 400:
+            raise self._api_error(response, status_code, raw_body)
+
+        if not raw_body.strip():
+            return {}
+
+        content_type = response.headers.get("Content-Type", "") if hasattr(response, "headers") else ""
+        if not isinstance(content_type, str):
+            content_type = ""
+        # A deployment serving the panel UI answers unknown routes with its HTML page and status 200
+        if "text/html" in content_type.lower() or raw_body.lstrip().startswith("<"):
+            raise APIException(
+                status_code,
+                -1,
+                f"unexpected non-JSON response (Content-Type {content_type!r}); "
+                "check that the endpoint URL and route are correct",
+                raw_body=raw_body,
+            )
+
+        try:
+            return response.json()
+        except ValueError:
+            error = APIException(status_code, -1, "failed to parse response body", raw_body=raw_body)
+        raise error
+
+    @staticmethod
+    def _api_error(response: Any, status_code: int, raw_body: str) -> APIException:
+        reason = getattr(response, "reason", "") or "HTTP error with no content"
+        if not raw_body.strip():
+            return APIException(status_code, -1, reason, raw_body=raw_body)
+        try:
+            body = response.json()
+        except ValueError:
+            return APIException(status_code, -1, raw_body, raw_body=raw_body)
+        if not isinstance(body, dict):
+            return APIException(status_code, -1, raw_body, raw_body=raw_body)
+
+        message = body.get("message")
+        if message is None:
+            message = body.get("error", raw_body)
+        status = body.get("status")
+        errors = body.get("errors")
+        return APIException(
+            status_code,
+            body.get("code", -1),
+            str(message),
+            status=str(status) if status is not None else None,
+            errors=errors if isinstance(errors, dict) else None,
+            raw_body=raw_body,
+        )
+
+    def _versioned_base_url(self, version: str) -> str:
+        """Returns the base URL for another API version, replacing a trailing /api/vN segment"""
+        parsed = urlsplit(self.base_url)
+        segments = [segment for segment in parsed.path.split("/") if segment]
+        if len(segments) >= 2 and segments[-2] == "api" and segments[-1].startswith("v"):
+            segments[-1] = version
+        else:
+            segments += ["api", version]
+        return urlunsplit(parsed._replace(path="/" + "/".join(segments))).rstrip("/")
+
+    @staticmethod
+    def _path_id(value: str, name: str = "id") -> str:
+        """URL-encodes a path identifier, rejecting empty values"""
+        if not value:
+            raise ValueError(f"{name} is required")
+        return quote(str(value), safe="")
 
     def create_order(self, order: OrderCreateDTO) -> OrderResponse:
         endpoint = "/order/create"
@@ -141,6 +214,15 @@ class TapsilatAPI:
         payload = order.to_dict()
         response_data = self._make_request("POST", endpoint, json_payload=payload)
         response = OrderResponse(response_data)
+
+        # The create response has no checkout URL; read it from the order, ignoring failures
+        if response.reference_id and not response.checkout_url:
+            try:
+                checkout_url = self.get_order(response.reference_id).checkout_url
+            except (APIException, ValueError):
+                checkout_url = None
+            if checkout_url:
+                response["checkout_url"] = checkout_url
 
         return response
 
@@ -191,12 +273,12 @@ class TapsilatAPI:
         return self._make_request("GET", endpoint)
 
     def get_order(self, reference_id: str) -> OrderResponse:
-        endpoint = f"/order/{reference_id}"
+        endpoint = f"/order/{quote(reference_id, safe='')}"
         response = self._make_request("GET", endpoint)
         return OrderResponse(response)
 
     def get_order_by_conversation_id(self, conversation_id: str) -> OrderResponse:
-        endpoint = f"/order/conversation/{conversation_id}"
+        endpoint = f"/order/conversation/{quote(conversation_id, safe='')}"
         response = self._make_request("GET", endpoint)
         return OrderResponse(response)
 
@@ -208,6 +290,7 @@ class TapsilatAPI:
         end_date: str = "",
         organization_id: str = "",
         related_reference_id: str = "",
+        conversation_id: str = "",
         buyer_id: str = "",
         status: Optional[int] = None,
     ) -> dict:
@@ -219,6 +302,7 @@ class TapsilatAPI:
             "end_date": end_date,
             "organization_id": organization_id,
             "related_reference_id": related_reference_id,
+            "conversation_id": conversation_id,
             "buyer_id": buyer_id,
             "status": status,
         }
@@ -255,23 +339,74 @@ class TapsilatAPI:
         return self._make_request("POST", endpoint, json_payload=payload)
 
     def get_order_payment_details_by_id(self, reference_id: str) -> dict:
-        endpoint = f"/order/{reference_id}/payment-details"
+        endpoint = f"/order/{quote(reference_id, safe='')}/payment-details"
         return self._make_request("GET", endpoint)
+
+    def get_order_payment_details_by_conversation_id(self, conversation_id: str) -> dict:
+        """Get an order's payment details looked up by its conversation ID"""
+        return self._make_request(
+            "POST", "/order/payment-details", json_payload={"conversation_id": conversation_id}
+        )
 
     def get_order_status(self, reference_id: str) -> dict:
-        endpoint = f"/order/{reference_id}/status"
+        endpoint = f"/order/{quote(reference_id, safe='')}/status"
         return self._make_request("GET", endpoint)
 
-    def get_order_transactions(self, reference_id: str) -> dict:
-        endpoint = f"/order/{reference_id}/transactions"
-        return self._make_request("GET", endpoint)
+    def get_order_transactions(self, reference_id: str) -> List[dict]:
+        """Get the order's transactions; the list is empty when there are none"""
+        endpoint = f"/order/{quote(reference_id, safe='')}/transactions"
+        return self._make_request("GET", endpoint) or []
+
+    def get_order_payments(self, request: GetOrderPaymentsRequest) -> dict:
+        """List the payments made against an order with commission totals"""
+        return self._make_request("POST", "/order/payments", json_payload=request.to_dict())
+
+    def charge_order(self, request: OrderChargeRequest) -> dict:
+        """Charge an order; inspect ``isSuccess``, since the request can succeed while the charge fails"""
+        return self._make_request("POST", "/order/charge", json_payload=request.to_dict())
+
+    def approve_submerchant_payment(self, request: SubmerchantPaymentAction) -> dict:
+        """Submit the stored item payout to the approval workflow.
+
+        Deprecated: use ``approve_marketplace_payouts`` with explicit payout IDs.
+        """
+        return self._make_request(
+            "POST", "/submerchants/payment/approve", json_payload=request.to_dict()
+        )
+
+    def disapprove_submerchant_payment(self, request: SubmerchantPaymentAction) -> dict:
+        """Withdraw a stored payout's approval; inspect ``status`` and keep ``operation_id``"""
+        return self._make_request(
+            "POST", "/submerchants/payment/disapprove", json_payload=request.to_dict()
+        )
+
+    def update_submerchant_payment_item(self, request: SubmerchantPaymentItemUpdate) -> dict:
+        """Change a stored payout allocation; inspect ``status`` and keep ``operation_id``"""
+        return self._make_request(
+            "PUT", "/submerchants/payment/item", json_payload=request.to_dict()
+        )
+
+    def get_card_installments(self, request: CardInstallmentsRequest) -> dict:
+        """Get installment options and commission rates for a card BIN and amount"""
+        return self._make_request("GET", "/card/installments", params=request.to_params())
+
+    def get_installment_table(self, request: InstallmentTableRequest) -> dict:
+        """Get installment options grouped by bank card program, with an interest-free flag per row"""
+        return self._make_request("GET", "/card/installment-table", params=request.to_params())
 
     def create_order_term(self, term: OrderPaymentTermCreateDTO) -> dict:
         endpoint = "/order/term"
         payload = term.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def delete_order_term(self, request: OrderPaymentTermDeleteDTO) -> dict:
+    def delete_order_term(
+        self,
+        request: Union[OrderPaymentTermDeleteDTO, str],
+        term_reference_id: Optional[str] = None,
+    ) -> dict:
+        """Delete a payment term; pass a DTO or the order ID and term reference ID"""
+        if isinstance(request, str):
+            request = OrderPaymentTermDeleteDTO(order_id=request, term_reference_id=term_reference_id or "")
         endpoint = "/order/term"
         payload = request.to_dict()
         return self._make_request("DELETE", endpoint, json_payload=payload)
@@ -287,6 +422,8 @@ class TapsilatAPI:
         return self._make_request("GET", endpoint, params=params)
 
     def refund_order_term(self, term: OrderTermRefundRequest) -> dict:
+        if not term.reference_id:
+            raise ValueError("reference_id (the order's reference ID) is required to refund a term")
         endpoint = "/order/term/refund"
         payload = term.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
@@ -305,6 +442,22 @@ class TapsilatAPI:
         endpoint = "/order/releated"
         payload = request.to_dict()
         return self._make_request("PATCH", endpoint, json_payload=payload)
+
+    def order_terminate(self, reference_id: str) -> dict:
+        """Terminate an order by reference ID"""
+        return self.terminate_order(TerminateRequest(reference_id=reference_id))
+
+    def order_manual_callback(self, reference_id: str, conversation_id: Optional[str] = None) -> dict:
+        """Ask the server to resend the order's callback"""
+        return self.manual_callback(
+            OrderManualCallbackDTO(reference_id=reference_id, conversation_id=conversation_id)
+        )
+
+    def order_related_update(self, reference_id: str, related_reference_id: str) -> dict:
+        """Link an order to a related reference ID"""
+        return self.related_update(
+            OrderRelatedReferenceDTO(reference_id=reference_id, related_reference_id=related_reference_id)
+        )
 
     def update_payment_options(self, request: OrderPaymentOptionsUpdateDTO) -> dict:
         endpoint = "/order/payment-options"
@@ -345,17 +498,12 @@ class TapsilatAPI:
         """DEPRECATED: Use get_order_list instead. Get orders with pagination and optional buyer filter"""
         return self.get_order_list(page=int(page), per_page=int(per_page), buyer_id=buyer_id)
 
-    def get_order_payments(self, request: GetOrderPaymentsRequest) -> dict:
-        endpoint = "/order/payments"
-        payload = request.to_dict()
-        return self._make_request("POST", endpoint, json_payload=payload)
-
     def get_order_pdf(self, id: str) -> FileResponse:
-        endpoint = f"/order/{id}/export/pdf"
+        endpoint = f"/order/{self._path_id(id, 'id')}/export/pdf"
         return self._make_request("GET", endpoint, raw_response=True)
 
     def get_order_excel(self, id: str) -> FileResponse:
-        endpoint = f"/order/{id}/export/excel"
+        endpoint = f"/order/{self._path_id(id, 'id')}/export/excel"
         return self._make_request("GET", endpoint, raw_response=True)
 
     def create_order_refund_request(self, request: RefundOrderDTO) -> dict:
@@ -396,20 +544,48 @@ class TapsilatAPI:
         return self._make_request("GET", endpoint)
 
     def get_organization_limit_user(self, request: GetUserLimitRequest) -> dict:
-        """Get User Limits Configuration"""
+        """Get User Limits Configuration.
+
+        Deprecated: the API has no organization user limit route, so this call always fails.
+        """
+        warnings.warn(
+            "get_organization_limit_user calls a route the API does not provide",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         endpoint = "/organization/limit/user"
         payload = request.to_dict()
         return self._make_request("GET", endpoint, json_payload=payload)
 
     def set_organization_limit_user(self, request: SetLimitUserRequest) -> dict:
-        """Set Limit To User"""
+        """Set Limit To User.
+
+        Deprecated: the API has no organization user limit route, so this call always fails.
+        """
+        warnings.warn(
+            "set_organization_limit_user calls a route the API does not provide",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         endpoint = "/organization/limit/user"
         payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
 
-    def get_organization_limits(self) -> dict:
-        """Get Organization Transaction Limits"""
-        endpoint = "/organization/limits"
+    def get_organization_limits(self, organization_id: Optional[str] = None) -> dict:
+        """Get an organization's transaction limits.
+
+        Calling it without ``organization_id`` is deprecated: the API has no
+        ``/organization/limits`` route, so that request always fails.
+        """
+        if not organization_id:
+            warnings.warn(
+                "get_organization_limits without organization_id calls a route the API does not provide; "
+                "pass the organization ID",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return self._make_request("GET", "/organization/limits")
+        endpoint = f"/organization/{quote(organization_id, safe='')}/limits"
         return self._make_request("GET", endpoint)
 
     def list_organization_vpos(self, request: GetVposRequest) -> dict:
@@ -420,7 +596,7 @@ class TapsilatAPI:
 
     def get_organization_meta(self, name: str) -> dict:
         """Get Organization Metadata"""
-        endpoint = f"/organization/metas/{name}"
+        endpoint = f"/organization/metas/{quote(name, safe='')}"
         return self._make_request("GET", endpoint)
 
     def get_organization_scopes(self) -> dict:
@@ -436,20 +612,74 @@ class TapsilatAPI:
         params = {"page": page, "per_page": per_page}
         return self._make_request("GET", endpoint, params=params)
 
+    def get_suborganization(self, suborganization_id: str) -> dict:
+        """Get a suborganization's detail"""
+        endpoint = f"/organization/suborganizations/{self._path_id(suborganization_id, 'suborganization_id')}"
+        return self._make_request("GET", endpoint)
+
+    def get_submerchant_by_suborganization(self, suborganization_id: str) -> dict:
+        endpoint = (
+            f"/organization/suborganizations/{self._path_id(suborganization_id, 'suborganization_id')}"
+            "/submerchant"
+        )
+        return self._make_request("GET", endpoint)
+
+    def list_organization_currency_presets(self) -> dict:
+        return self._make_request("GET", "/organization/currency-presets")
+
     def get_organization_suborganization_details(self, id: str) -> dict:
         """Get Sub-Organization Details"""
-        endpoint = f"/organization/suborganizations/{id}"
-        return self._make_request("GET", endpoint)
+        return self.get_suborganization(id)
 
     def get_organization_suborganization_submerchants(self, id: str) -> dict:
         """Get Sub-Organization Submerchants"""
-        endpoint = f"/organization/suborganizations/{id}/submerchant"
-        return self._make_request("GET", endpoint)
+        return self.get_submerchant_by_suborganization(id)
 
     def get_organization_currency_presets(self) -> dict:
         """Get Organization Currency Presets"""
-        endpoint = "/organization/currency-presets"
-        return self._make_request("GET", endpoint)
+        return self.list_organization_currency_presets()
+
+    def create_organization_currency(self, currency_code: str) -> dict:
+        """Add a currency to the organization by ISO code, for example USD"""
+        response = self._make_request(
+            "POST",
+            "/organization/currencies",
+            json_payload={"currency_code": currency_code.strip().upper()},
+        )
+        self._currency_ids_by_unit = None
+        return response
+
+    def create_organization_user_token(
+        self, request: Union[OrgUserTokenCreateRequest, OrgUserTokenCreateReq]
+    ) -> dict:
+        """Create an access token for an organization user; ``expire`` is in minutes"""
+        return self._make_request(
+            "POST", "/organization/user/token", json_payload=request.to_dict()
+        )
+
+    def resolve_currency_id(self, ref: str) -> str:
+        """Return the organization currency UUID for a unit such as "TRY"; a UUID is returned unchanged.
+
+        Most endpoints accept units directly, so this is only needed where a UUID is required.
+        """
+        ref = (ref or "").strip()
+        if not ref:
+            raise ValueError("currency_id is required")
+        if _UUID_PATTERN.match(ref):
+            return ref
+        if self._currency_ids_by_unit is None:
+            response = self.get_organization_currencies() or {}
+            self._currency_ids_by_unit = {
+                (currency.get("currency_unit") or "").strip().upper(): currency.get("id")
+                for currency in response.get("currencies") or []
+                if currency.get("currency_unit") and currency.get("id")
+            }
+        currency_id = self._currency_ids_by_unit.get(ref.upper())
+        if not currency_id:
+            raise ValueError(
+                f"unknown currency reference {ref!r}; use a currency UUID or organization currency unit"
+            )
+        return currency_id
 
     def create_organization_user(self, request: OrgCreateUserReq) -> dict:
         """Create Organization User"""
@@ -468,46 +698,6 @@ class TapsilatAPI:
         endpoint = "/organization/user/verify-mobile"
         payload = request.to_dict()
         return self._make_request("POST", endpoint, json_payload=payload)
-
-    def create_organization_user_token(self, request: OrgUserTokenCreateReq) -> dict:
-        """Create Organization User Token"""
-        endpoint = "/organization/user/token"
-        payload = request.to_dict()
-        return self._make_request("POST", endpoint, json_payload=payload)
-
-    # Submerchant methods
-    def create_submerchant(self, request: SubmerchantCreateDTO) -> dict:
-        """Create Submerchant"""
-        endpoint = "/submerchants"
-        payload = request.to_dict()
-        return self._make_request("POST", endpoint, json_payload=payload)
-
-    def get_submerchant(self, id: str) -> dict:
-        """Get Submerchant by ID"""
-        endpoint = f"/submerchants/{id}"
-        return self._make_request("GET", endpoint)
-
-    def get_suborganization_by_submerchant(self, id: str) -> dict:
-        """Get Suborganization by Submerchant ID"""
-        endpoint = f"/submerchants/{id}/suborganization"
-        return self._make_request("GET", endpoint)
-
-    def update_submerchant(self, id: str, request: SubmerchantUpdateDTO) -> dict:
-        """Update Submerchant"""
-        endpoint = f"/submerchants/{id}"
-        payload = request.to_dict()
-        return self._make_request("PATCH", endpoint, json_payload=payload)
-
-    def delete_submerchant(self, id: str) -> dict:
-        """Delete Submerchant"""
-        endpoint = f"/submerchants/{id}"
-        return self._make_request("DELETE", endpoint)
-
-    def list_submerchants(self, page: int = 1, per_page: int = 10) -> dict:
-        """List Submerchants"""
-        endpoint = "/submerchants"
-        params = {"page": page, "per_page": per_page}
-        return self._make_request("GET", endpoint, params=params)
 
     # Subscription methods
     def get_subscription(self, request: SubscriptionGetRequest) -> dict:
@@ -541,17 +731,11 @@ class TapsilatAPI:
         return self._make_request("POST", endpoint, json_payload=payload)
 
 
-    def charge_order(self, request: OrderChargeRequest) -> Dict[str, Any]:
-        endpoint = "/order/charge"
-        payload = request.to_dict()
-        return self._make_request("POST", endpoint, json_payload=payload)
-
     def create_org_currency(self, payload: CreateOrganizationCurrencyPayload) -> Dict[str, Any]:
-        endpoint = "/organization/currencies"
-        return self._make_request("POST", endpoint, json_payload=payload.to_dict())
+        return self.create_organization_currency(payload.currency_code)
 
     def get_org_metadata(self, name: str) -> Dict[str, Any]:
-        endpoint = f"/organization/meta/{name}"
+        endpoint = f"/organization/metas/{quote(name, safe='')}"
         return self._make_request("GET", endpoint)
 
     def get_org_partners(self) -> Dict[str, Any]:
@@ -559,7 +743,7 @@ class TapsilatAPI:
         return self._make_request("GET", endpoint)
 
     def get_org_limits(self, org_id: str, currency: str = None, operation: str = None) -> Dict[str, Any]:
-        endpoint = f"/organization/{org_id}/limits"
+        endpoint = f"/organization/{self._path_id(org_id, 'org_id')}/limits"
         params = {}
         if currency:
             params['currency'] = currency
@@ -577,4 +761,5 @@ class TapsilatAPI:
         expected_signature = hmac.new(
             secret.encode(), payload.encode(), hashlib.sha256
         ).hexdigest()
-        return f"sha256={expected_signature}" == signature
+        # Compare in constant time so the signature cannot be guessed byte by byte
+        return hmac.compare_digest(f"sha256={expected_signature}", signature or "")

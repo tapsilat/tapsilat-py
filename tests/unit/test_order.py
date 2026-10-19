@@ -195,12 +195,14 @@ def test_create_order_success(mock_api_request, mocker):
     client = TapsilatAPI()
     order_response_obj = client.create_order(order_payload_dto)
 
-    mock_api_request.assert_called_once_with(
+    assert mock_api_request.call_args_list[0] == mocker.call(
         "POST", "/order/create", json_payload=order_payload_dto.to_dict()
     )
     assert isinstance(order_response_obj, OrderResponse)
     assert order_response_obj.order_id == expected_api_json_response["order_id"]
     assert order_response_obj.reference_id == expected_api_json_response["reference_id"]
+    # The checkout URL is read from the created order
+    assert mock_api_request.call_args_list[1][0][0] == "GET"
 
 
 def test_create_order_with_basket_items(mock_api_request, mocker):
@@ -229,10 +231,12 @@ def test_create_order_with_basket_items(mock_api_request, mocker):
 
     api_response = client.create_order(order_payload_dto)
 
-    mock_api_request.assert_called_once_with(
+    assert mock_api_request.call_args_list[0] == mocker.call(
         "POST", "/order/create", json_payload=order_payload_dto.to_dict()
     )
     assert api_response.order_id == expected_api_json_response["order_id"]
+    # The checkout URL is read from the created order
+    assert mock_api_request.call_args_list[1][0][0] == "GET"
 
 
 def test_get_order_success(mock_api_request):
@@ -863,7 +867,7 @@ def test_create_order_with_gsm_validation(mock_api_request, mocker):
 
     # Verify GSM was cleaned
     assert order_payload_dto.buyer.gsm_number == "+905551234567"
-    mock_api_request.assert_called_once()
+    assert mock_api_request.call_args_list[0][0][:2] == ("POST", "/order/create")
     assert isinstance(order_response_obj, OrderResponse)
 
 

@@ -25,6 +25,13 @@ jobs:
       run: |
         pip install -r requirements.txt
         pip install -e .
+    - name: Check release tag matches package version
+      run: |
+        version="$(python -c "from importlib.metadata import version; print(version('tapsilat-py'))")"
+        if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+          echo "::error::Release tag $GITHUB_REF_NAME does not match setup.py version $version"
+          exit 1
+        fi
     - name: Run tests with pytest
       run: |
         pytest

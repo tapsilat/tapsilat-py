@@ -2,6 +2,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import hmac
 import re
+import time
 import warnings
 import hashlib
 from urllib.parse import quote, urlsplit, urlunsplit
@@ -59,10 +60,12 @@ from .submerchants import SubmerchantMixin
 from .tokenization import TokenizationMixin
 from .validators import validate_gsm_number, validate_installments
 from .vpos import VposMixin
+from .webhooks import WEBHOOK_TOLERANCE
 
 _UUID_PATTERN = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
+_SIGNATURE_TIMESTAMP_PATTERN = re.compile(r"[0-9]+")
 
 
 class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMixin):
@@ -756,10 +759,60 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
         return self._make_request("GET", endpoint)
 
     @staticmethod
-    def verify_webhook(payload: str, signature: str, secret: str) -> bool:
-        """Verify webhook signature"""
-        expected_signature = hmac.new(
-            secret.encode(), payload.encode(), hashlib.sha256
-        ).hexdigest()
-        # Compare in constant time so the signature cannot be guessed byte by byte
-        return hmac.compare_digest(f"sha256={expected_signature}", signature or "")
+    def verify_webhook(
+        payload: Union[str, bytes],
+        signature: Optional[str],
+        secret: Union[str, bytes],
+        tolerance: int = WEBHOOK_TOLERANCE,
+        now: Optional[int] = None,
+    ) -> bool:
+        """Verify the Tapsilat-Signature header of a callback against the organization's webhook secret
+
+        Tapsilat sends ``t=<unix timestamp>,v1=<hex HMAC-SHA256 of "<timestamp>.<raw body>">``. The
+        timestamp must be within ``tolerance`` seconds of ``now`` (the current time by default; 0
+        disables the check) so that a captured callback cannot be replayed. ``payload`` must be the
+        raw request body, before any JSON decoding. The comparison takes constant time.
+
+        A bare hex HMAC-SHA256 of the payload, with or without a ``sha256=`` prefix, is still
+        accepted for signatures made the way earlier versions of this SDK documented.
+        """
+        signature = (signature or "").strip()
+        if not signature or not secret:
+            return False
+        if isinstance(payload, str):
+            payload = payload.encode("utf-8")
+        if isinstance(secret, str):
+            secret = secret.encode("utf-8")
+
+        if signature.startswith("sha256=") or "=" not in signature:
+            if signature.startswith("sha256="):
+                signature = signature[len("sha256="):]
+            expected = hmac.new(secret, payload, hashlib.sha256).hexdigest().encode("ascii")
+            # Compare bytes in constant time; bytes.lower() only changes ASCII letters
+            return hmac.compare_digest(expected, signature.encode("utf-8").lower())
+
+        timestamp = None
+        candidates = []
+        for part in signature.split(","):
+            key, separator, value = part.strip().partition("=")
+            if not separator:
+                continue
+            if key == "t":
+                timestamp = value
+            elif key == "v1":
+                candidates.append(value.encode("utf-8").lower())
+        if timestamp is None or not _SIGNATURE_TIMESTAMP_PATTERN.fullmatch(timestamp) or not candidates:
+            return False
+        if tolerance > 0:
+            try:
+                signed_at = int(timestamp)
+            except ValueError:  # more digits than int() parses
+                return False
+            current = int(time.time()) if now is None else int(now)
+            if abs(current - signed_at) > tolerance:
+                return False
+
+        mac = hmac.new(secret, timestamp.encode("ascii") + b".", hashlib.sha256)
+        mac.update(payload)
+        expected = mac.hexdigest().encode("ascii")
+        return any(hmac.compare_digest(expected, candidate) for candidate in candidates)

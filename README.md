@@ -303,12 +303,50 @@ Approval policies need a currency UUID; `create_marketplace_approval_policy` and
 ## System & Webhooks
 
 ### Verify Webhook Request
+Tapsilat signs every callback it sends to your callback URLs, and to an order's `payment_success_url` and `payment_failure_url`, with the webhook secret from the panel's callback settings. The `Tapsilat-Signature` header looks like `t=1726480000,v1=5257a8…`: `v1` is the hex HMAC-SHA256 of the timestamp, a dot and the raw body.
+
+`TapsilatAPI.verify_webhook` checks it in constant time and rejects a timestamp more than 5 minutes from the server clock, so a captured callback cannot be replayed. Pass the raw body (`str` or `bytes`), not re-encoded JSON. A Flask handler, for example:
 ```python
-# This verifies the signature sent by Tapsilat webhook
-is_valid = client.verify_webhook(
-    payload='{"event": "order.completed", "data": {...}}',
-    signature="some-hash-signature"
-)
+from flask import Flask, request
+
+from tapsilat_py import WEBHOOK_SIGNATURE_HEADER, TapsilatAPI, WebhookEvent
+
+app = Flask(__name__)
+WEBHOOK_SECRET = "your_webhook_secret"
+
+
+@app.post("/tapsilat/callback")
+def tapsilat_callback():
+    payload = request.get_data()  # the raw body
+    signature = request.headers.get(WEBHOOK_SIGNATURE_HEADER, "")  # "Tapsilat-Signature"
+    if not TapsilatAPI.verify_webhook(payload, signature, WEBHOOK_SECRET):
+        return "", 400
+
+    event = WebhookEvent.from_payload(payload)
+    event.type             # "order_lite" (the default), "order", "order_payment_detail", ...
+    event.reference_id     # the order's reference ID, whatever the callback type
+    event.conversation_id
+    event.status           # e.g. "Paid", when the callback type carries a status
+
+    if event.is_paid:
+        ...  # fulfil the order
+    return "", 200
+```
+
+A different tolerance in seconds can be passed as `tolerance` (`0` disables the timestamp check). A bare hex HMAC of the body, with or without a `sha256=` prefix, is still accepted for signatures made the way earlier SDK versions documented.
+
+### Order Statuses
+`OrderStatus` has the numeric status codes that callbacks carry, the names `get_order_status()` returns, and the groups most integrations need:
+```python
+from tapsilat_py import OrderStatus
+
+status = client.get_order_status(reference_id)["status"]  # e.g. "Waiting for payment"
+
+OrderStatus.is_paid(status)      # Paid, Completed, Sub merchant payment approved
+OrderStatus.is_failed(status)    # Cancelled, Fraud, Rejected, Failure, Expired, Terminated
+OrderStatus.is_refunded(status)  # Refunded, Partially refunded
+OrderStatus.code(status)         # 7; also accepts "7" or 7
+OrderStatus.name(7)              # "Waiting for payment"
 ```
 
 ### Get System Definitions and Statuses

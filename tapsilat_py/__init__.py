@@ -3,6 +3,15 @@ __version__ = "2026.10.20"
 from .client import TapsilatAPI
 from .exceptions import APIException
 from .models import (
+    ElementsCardBrand,
+    ElementsCardSummary,
+    ElementsLastError,
+    ElementsMode,
+    ElementsPurpose,
+    ElementsSession,
+    ElementsSessionCreateRequest,
+    ElementsSessionWithSecret,
+    ElementsStatus,
     OrderCreateDTO,
     OrderPaymentOptionsUpdateDTO,
     SplitOrderItemPaymentDTO,
@@ -23,6 +32,15 @@ from .webhooks import (
 __all__ = [
     "TapsilatAPI",
     "APIException",
+    "ElementsCardBrand",
+    "ElementsCardSummary",
+    "ElementsLastError",
+    "ElementsMode",
+    "ElementsPurpose",
+    "ElementsSession",
+    "ElementsSessionCreateRequest",
+    "ElementsSessionWithSecret",
+    "ElementsStatus",
     "OrderCreateDTO",
     "OrderPaymentOptionsUpdateDTO",
     "SplitOrderItemPaymentDTO",

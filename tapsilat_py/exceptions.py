@@ -9,6 +9,10 @@ class APIException(Exception):
     ``error`` the ``message`` field, falling back to ``error`` or the raw body.
     ``status``, ``errors`` and ``raw_body`` carry the body's ``status`` field,
     per-field validation messages and the unparsed response body.
+
+    Elements routes nest the error as ``{"error": {"code", "message", "retryable"}}``;
+    ``code`` and ``error`` are read from that object, and ``retryable`` is True when
+    it says the request can be retried.
     """
 
     def __init__(
@@ -19,6 +23,7 @@ class APIException(Exception):
         status: Optional[str] = None,
         errors: Optional[Dict[str, Any]] = None,
         raw_body: Optional[str] = None,
+        retryable: bool = False,
     ):
         super().__init__(
             f"Tapsilat API Error\n status_code:{status_code}\ncode:{code}\nerror:{error}"
@@ -30,3 +35,4 @@ class APIException(Exception):
         self.status = status
         self.errors = errors
         self.raw_body = raw_body
+        self.retryable = retryable

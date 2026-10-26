@@ -300,6 +300,37 @@ client.run_marketplace_payout_operation(payout_id, MarketplacePayoutOperationInp
 
 Approval policies need a currency UUID; `create_marketplace_approval_policy` and `update_marketplace_approval_policy` resolve units such as `TRY` for you, and `client.resolve_currency_id("TRY")` exposes the same lookup.
 
+## Elements Sessions
+
+Tapsilat Elements is the native Android and iOS card sheet. Your backend creates a session with its secret API key and passes only the session's `client_secret` to the app, which opens the sheet with it. Card data goes from the sheet to Tapsilat encrypted and never reaches your backend.
+
+```python
+from tapsilat_py import ElementsPurpose, ElementsSessionCreateRequest, ElementsStatus
+
+session = client.create_elements_session(ElementsSessionCreateRequest(
+    purpose=ElementsPurpose.PAY,
+    order_reference_id=order_reference_id,
+    save_card=True,
+))
+# Return session.id and session.client_secret to your app. Do not log or store the secret.
+
+# Later, read the outcome on your backend instead of trusting the app:
+outcome = client.get_elements_session(session.id)
+if outcome.status == ElementsStatus.SUCCEEDED:
+    ...  # fulfil the order; outcome.card holds brand, last4 and expiry
+
+# Cancel a session that is still waiting for a card
+client.cancel_elements_session(session.id)
+```
+
+- `create_elements_session(request)` calls `POST /elements/sessions` and returns an `ElementsSessionWithSecret`.
+- `get_elements_session(session_id)` calls `GET /elements/sessions/{id}` and returns an `ElementsSession`.
+- `cancel_elements_session(session_id)` calls `POST /elements/sessions/{id}/cancel` and returns an `ElementsSession`. A session that is confirming or has completed comes back unchanged.
+
+A `pay` session needs `order_reference_id`. A `tokenize` session saves a card for `user_id`, with `mode` set to `ElementsMode.SECURE` (3D Secure), `ElementsMode.HALF_SECURE` or `ElementsMode.NON_SECURE`. `status` and `purpose` are strings, compared with the `ElementsStatus` and `ElementsPurpose` constants; timestamps are RFC 3339 strings.
+
+The client secret is returned only by `create_elements_session`. `repr()` and `str()` of `ElementsSessionWithSecret` leave it out, while `to_dict()` keeps it so that you can send it to the app. Elements errors raise `APIException` with a stable `code` (for example `elements_not_enabled` or `session_not_found`) and `retryable`.
+
 ## System & Webhooks
 
 ### Verify Webhook Request
@@ -461,7 +492,7 @@ print(f"Redirect to: {response.url}")
 
 ## Error Handling
 
-All API methods raise `APIException` on errors. Besides `status_code`, `code` and `error` (also available as `message`), it carries the body's `status`, per-field validation `errors` and the `raw_body`. Most "not found" errors arrive as HTTP 400, and rejected state changes (for example approving an ineligible payout) as HTTP 424. A successful status with an HTML body, which a deployment serving the panel UI returns for unknown routes, also raises `APIException`.
+All API methods raise `APIException` on errors. Besides `status_code`, `code` and `error` (also available as `message`), it carries the body's `status`, per-field validation `errors`, the `raw_body` and `retryable`, which is True when the error says the request can be retried. Elements routes nest the error as `{"error": {"code": "...", "message": "...", "retryable": true}}`; `code`, `error` and `retryable` are read from that object. Most "not found" errors arrive as HTTP 400, and rejected state changes (for example approving an ineligible payout) as HTTP 424. A successful status with an HTML body, which a deployment serving the panel UI returns for unknown routes, also raises `APIException`.
 
 ```python
 from tapsilat_py.exceptions import APIException

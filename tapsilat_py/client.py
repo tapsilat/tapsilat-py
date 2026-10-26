@@ -9,6 +9,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 import requests
 
+from .elements import ElementsMixin
 from .exceptions import APIException
 from .models import (
     OrderAccountingRequest,
@@ -68,7 +69,9 @@ _UUID_PATTERN = re.compile(
 _SIGNATURE_TIMESTAMP_PATTERN = re.compile(r"[0-9]+")
 
 
-class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMixin):
+class TapsilatAPI(
+    SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMixin, ElementsMixin
+):
     def __init__(
         self,
         api_key: str = "",
@@ -165,17 +168,28 @@ class TapsilatAPI(SubmerchantMixin, VposMixin, TokenizationMixin, MarketplaceMix
             return APIException(status_code, -1, raw_body, raw_body=raw_body)
 
         message = body.get("message")
-        if message is None:
+        code = body.get("code", -1)
+        retryable = False
+        nested = body.get("error")
+        if isinstance(nested, dict):
+            # Elements routes nest the error: {"error": {"code": ..., "message": ..., "retryable": ...}}
+            if "code" not in body and "code" in nested:
+                code = nested["code"]
+            if message is None:
+                message = nested.get("message", raw_body)
+            retryable = nested.get("retryable") is True
+        elif message is None:
             message = body.get("error", raw_body)
         status = body.get("status")
         errors = body.get("errors")
         return APIException(
             status_code,
-            body.get("code", -1),
+            code,
             str(message),
             status=str(status) if status is not None else None,
             errors=errors if isinstance(errors, dict) else None,
             raw_body=raw_body,
+            retryable=retryable,
         )
 
     def _versioned_base_url(self, version: str) -> str:

@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass, fields, is_dataclass
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from typing import Any, Dict, List, Optional
 
 
@@ -927,6 +927,157 @@ class CardTokenizeRequest:
 
     def to_dict(self) -> dict:
         return _asdict_factory(self)
+
+
+# Elements sessions
+
+
+def _known_fields(cls, data: Any) -> Dict[str, Any]:
+    """Returns the entries of a decoded JSON object that are fields of the dataclass, ignoring the rest"""
+    if not isinstance(data, dict):
+        return {}
+    names = {f.name for f in fields(cls)}
+    return {key: value for key, value in data.items() if key in names}
+
+
+class ElementsPurpose:
+    """Purposes of an Elements session"""
+
+    TOKENIZE = "tokenize"
+    PAY = "pay"
+
+
+class ElementsMode:
+    """Tokenize modes of an Elements session"""
+
+    SECURE = 1  # 3D Secure
+    HALF_SECURE = 2
+    NON_SECURE = 3
+
+
+class ElementsStatus:
+    """Statuses of an Elements session. Sessions carry the status as a string, so a status added
+    later still decodes.
+    """
+
+    REQUIRES_PAYMENT_METHOD = "requires_payment_method"
+    PROCESSING = "processing"
+    REQUIRES_ACTION = "requires_action"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    EXPIRED = "expired"
+    CANCELED = "canceled"
+
+
+class ElementsCardBrand:
+    """Card brands an Elements session reports"""
+
+    VISA = "visa"
+    MASTERCARD = "mastercard"
+    AMEX = "amex"
+    TROY = "troy"
+    DISCOVER = "discover"
+    UNIONPAY = "unionpay"
+    UNKNOWN = "unknown"
+
+
+@dataclass
+class ElementsSessionCreateRequest:
+    """Creates an Elements session.
+
+    ``purpose`` is ``ElementsPurpose.PAY`` or ``ElementsPurpose.TOKENIZE``. A pay session needs
+    ``order_reference_id``; ``save_card`` lets the buyer save the card. A tokenize session saves a
+    card for ``user_id``, a user of your organization, with ``mode`` set to an ``ElementsMode`` value.
+    Fields left as None are not sent.
+    """
+
+    purpose: str
+    order_reference_id: Optional[str] = None
+    user_id: Optional[str] = None
+    user_email: Optional[str] = None
+    # 1 = 3D secure, 2 = half secure, 3 = non-secure
+    mode: Optional[int] = None
+    save_card: Optional[bool] = None
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class ElementsCardSummary:
+    id: Optional[str] = None
+    # An ElementsCardBrand value
+    brand: Optional[str] = None
+    last4: Optional[str] = None
+    exp_month: Optional[int] = None
+    exp_year: Optional[int] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ElementsCardSummary":
+        return cls(**_known_fields(cls, data))
+
+
+@dataclass
+class ElementsLastError:
+    """Why the session's last attempt failed, for example ``card_declined``"""
+
+    code: Optional[str] = None
+    message: Optional[str] = None
+    retryable: Optional[bool] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ElementsLastError":
+        return cls(**_known_fields(cls, data))
+
+
+@dataclass
+class ElementsSession:
+    """The authoritative state of an Elements session.
+
+    ``status`` is an ``ElementsStatus`` value and ``purpose`` an ``ElementsPurpose`` value.
+    Timestamps are RFC 3339 strings. Fields the response leaves out are None.
+    """
+
+    id: Optional[str] = None
+    purpose: Optional[str] = None
+    status: Optional[str] = None
+    order_reference_id: Optional[str] = None
+    user_id: Optional[str] = None
+    attempts: Optional[int] = None
+    max_attempts: Optional[int] = None
+    created_at: Optional[str] = None
+    expires_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    card: Optional[ElementsCardSummary] = None
+    last_error: Optional[ElementsLastError] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ElementsSession":
+        """Decodes a session from the response body, ignoring fields this SDK does not know"""
+        values = _known_fields(cls, data)
+        card = values.get("card")
+        values["card"] = ElementsCardSummary.from_dict(card) if isinstance(card, dict) else None
+        last_error = values.get("last_error")
+        values["last_error"] = (
+            ElementsLastError.from_dict(last_error) if isinstance(last_error, dict) else None
+        )
+        return cls(**values)
+
+    def to_dict(self) -> dict:
+        return _asdict_factory(self)
+
+
+@dataclass
+class ElementsSessionWithSecret(ElementsSession):
+    """A newly created Elements session.
+
+    Hand ``client_secret`` to the app that opens the card sheet; only the create response carries
+    it. Do not log or store it. ``repr()`` and ``str()`` leave it out, while ``to_dict()`` keeps it
+    so that it can be sent to the app.
+    """
+
+    client_secret: Optional[str] = field(default=None, repr=False)
+    elements_base_url: Optional[str] = None
 
 
 # Marketplace (API version 2)
